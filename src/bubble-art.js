@@ -11,12 +11,16 @@ function face(ctx, y = 0, wide = .29) {
   ctx.strokeStyle = '#394159'; ctx.lineWidth = .035; ctx.lineCap = 'round'; ctx.beginPath(); ctx.arc(0, y + .12, .095, .08, Math.PI - .08); ctx.stroke();
   for (const x of [-wide - .12, wide + .12]) ellipse(ctx, x, y + .12, .085, .045, '#ff799480');
 }
-export function drawCharacter(ctx, skin, color, x, y, radius, time = 0, { player = false, protection = 0, numbers = false, lightBackground = false } = {}) {
+export function drawCharacter(ctx, skin, color, x, y, radius, time = 0, { player = false, protection = 0, feast = false, numbers = false, lightBackground = false } = {}) {
   const tone = COLORS[color] || COLORS[0];
   ctx.save(); ctx.translate(x, y); ctx.scale(radius, radius); ctx.lineWidth = .035;
   if (protection > 0) ctx.globalAlpha = .65 + Math.sin(time * 22) * .2;
   ellipse(ctx, .04, .9, .63, .12, '#07102a25');
   if (player) {
+    if (feast) {
+      ctx.lineWidth = .095;
+      COLORS.forEach((color, i) => { ctx.strokeStyle = color.hex; ctx.beginPath(); const a = time * .7 + i * Math.PI * 2 / 7; ctx.arc(0, 0, 1.32, a, a + .72); ctx.stroke(); });
+    }
     ctx.strokeStyle = protection ? '#da5b85' : lightBackground ? '#3d6488b0' : '#ffffffb0'; ctx.lineWidth = .035;
     ctx.setLineDash([.1, .08]); ctx.beginPath(); ctx.arc(0, 0, 1.23 + Math.sin(time * 3) * .025, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
   }
@@ -76,6 +80,32 @@ export function drawCharacter(ctx, skin, color, x, y, radius, time = 0, { player
 export function star(ctx, x, y, radius, fill) {
   ctx.beginPath(); for (let i = 0; i < 10; i++) { const angle = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? radius * .45 : radius; const px = x + Math.cos(angle) * r, py = y + Math.sin(angle) * r; if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); }
   ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
+}
+export function drawPickup(ctx, type, x, y, radius, time = 0) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(radius, radius); ctx.lineWidth = .05;
+  ellipse(ctx, 0, 1.04, .7, .13, '#09112c35');
+  ctx.strokeStyle = type === 'bomb' ? '#ffa275aa' : '#ffffff66'; ctx.lineWidth = .04;
+  ctx.beginPath(); ctx.arc(0, 0, 1.12, 0, Math.PI * 2); ctx.stroke();
+  if (type === 'heart') {
+    const glow = ctx.createLinearGradient(0, -.8, .3, .9); glow.addColorStop(0, '#ffb6ce'); glow.addColorStop(1, '#ef416c');
+    ctx.fillStyle = glow; ctx.strokeStyle = '#ffd0de'; ctx.beginPath(); ctx.moveTo(0, .85);
+    ctx.bezierCurveTo(-1.75, -.08, -.8, -1.5, 0, -.6); ctx.bezierCurveTo(.8, -1.5, 1.75, -.08, 0, .85); ctx.fill(); ctx.stroke();
+    ellipse(ctx, -.38, -.51, .14, .08, '#ffffffa0');
+    ctx.strokeStyle = '#fff6f9'; ctx.lineWidth = .14; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(-.22, 0); ctx.lineTo(.22, 0); ctx.moveTo(0, -.22); ctx.lineTo(0, .22); ctx.stroke();
+  } else if (type === 'feast') {
+    const glow = ctx.createLinearGradient(-1, -.9, 1, .9); COLORS.forEach((c, i) => glow.addColorStop(i / 6, c.hex));
+    star(ctx, 0, 0, 1.05, glow); ctx.strokeStyle = '#fff4d5'; ctx.stroke();
+    face(ctx, -.07, .22); ellipse(ctx, -.2, -.58, .11, .06, '#ffffff90');
+    star(ctx, 1.02, -.87, .16 + Math.sin(time * 4) * .025, '#fff0ae');
+  } else {
+    ctx.strokeStyle = '#d8b18a'; ctx.lineWidth = .12; ctx.beginPath(); ctx.moveTo(.25, -.72); ctx.quadraticCurveTo(.15, -1.28, .63, -1.11); ctx.stroke();
+    star(ctx, .65, -1.1, .24 + Math.sin(time * 10) * .03, '#ffbe68');
+    const metal = ctx.createRadialGradient(-.4, -.5, .04, .1, .3, 1.1); metal.addColorStop(0, '#6a748b'); metal.addColorStop(.45, '#252e44'); metal.addColorStop(1, '#080e20');
+    ellipse(ctx, 0, 0, .82, .82, metal, '#939cb4'); ellipse(ctx, -.3, -.4, .17, .07, '#dfe8ff80');
+    ctx.strokeStyle = '#ffb185'; ctx.lineWidth = .13; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(0, -.2); ctx.lineTo(0, .17); ctx.stroke(); ellipse(ctx, 0, .38, .07, .07, '#ffb185');
+  }
+  ctx.fillStyle = type === 'bomb' ? '#ffb58e' : '#e8f0ff'; ctx.textAlign = 'center'; ctx.font = '600 .35px Arial'; ctx.fillText(type === 'heart' ? '+1 ♥' : type === 'feast' ? '全色' : '危险', 0, 1.62);
+  ctx.restore();
 }
 function cloud(ctx, x, y, size, alpha) {
   ctx.save(); ctx.globalAlpha = alpha; ctx.fillStyle = '#ffffff';

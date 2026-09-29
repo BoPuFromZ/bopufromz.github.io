@@ -63,6 +63,12 @@ export function scheduleCue(ctx, destination, name, when = ctx.currentTime, trac
   } else if (name === 'gift') notes([79,84,88,91], .11, .5, .13);
   else if (name === 'start') notes([72,76,79], .08, .21, .12);
   else if (name === 'equip') notes([76,81], .075, .18, .10);
+  else if (name === 'heal') notes([72,79,84], .075, .25, .13);
+  else if (name === 'feast') notes([72,74,76,79,84,88], .055, .27, .11);
+  else if (name === 'bomb') {
+    noise(ctx, destination, when, .3, .20, 1200, track);
+    voice(ctx, destination, 120, when, .32, .18, 'triangle', 35, track);
+  }
 }
 export function createBubbleAudio({ contextFactory, storage } = {}) {
   let enabled = true, active = false, playing = false, ctx, master, musicBus, effectsBus, timer, nextStep = 0, step = 0;

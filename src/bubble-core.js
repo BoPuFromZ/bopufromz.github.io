@@ -31,6 +31,33 @@ export function createBag(value = {}) {
 }
 export function loadBag(fallback = {}) { try { return createBag(JSON.parse(localStorage.getItem(BAG_KEY)) || fallback); } catch { return createBag(fallback); } }
 export function saveBag(bag) { try { localStorage.setItem(BAG_KEY, JSON.stringify(createBag(bag))); return true; } catch { return false; } }
+// A guest collection lives only in memory; it can never overwrite the personal bag.
+export function createBackpackSession({ storage } = {}) {
+  try { storage ??= globalThis.localStorage; } catch {}
+  let bag = createBag(), personal = createBag(), mode = 'personal';
+  function read() { try { return createBag(JSON.parse(storage?.getItem(BAG_KEY)) || personal); } catch { return createBag(personal); } }
+  function save() {
+    if (mode === 'guest') return 'guest';
+    personal = createBag(bag);
+    try { if (!storage) return 'memory'; storage.setItem(BAG_KEY, JSON.stringify(personal)); return 'saved'; } catch { return 'memory'; }
+  }
+  return {
+    get bag() { return bag; }, get mode() { return mode; },
+    open() { if (mode === 'personal') bag = read(); return bag; }, save,
+    enterGuest() { if (mode !== 'guest') { save(); mode = 'guest'; bag = createBag(); } return bag; },
+    leaveGuest() { if (mode === 'guest') { mode = 'personal'; bag = read(); } return bag; },
+    reset() { bag = createBag({ bestScore: bag.bestScore }); save(); return bag; },
+  };
+}
+export function joystickVector(dx, dy, travel = 32, sensitivity = 1) {
+  if (![dx, dy, travel, sensitivity].every(Number.isFinite) || travel <= 0) return { x: 0, y: 0 };
+  const length = Math.hypot(dx, dy), radial = Math.min(1, length / travel);
+  if (radial <= .12) return { x: 0, y: 0 };
+  const amount = Math.min(1, Math.pow((radial - .12) / .88, 1.4) * Math.max(.65, Math.min(1.35, sensitivity)));
+  return { x: dx / length * amount, y: dy / length * amount };
+}
+export const MAX_LIVES = 5;
+export const FEAST_SECONDS = 8;
 export function unlockRewards(bag, score) {
   if (!Number.isFinite(score)) return [];
   bag.bestScore = Math.max(bag.bestScore, Math.floor(score));
@@ -55,14 +82,35 @@ export function openGift(bag) { if (!bag.giftEarned) return false; bag.voucher =
 export function createBubbleGame(width, height, random = Math.random) {
   const radius = Math.max(15, Math.min(25, Math.min(width, height) * .045));
   return { width, height, random, status: 'playing', score: 0, lives: 3, peak: 0, elapsed: 0, spawnIn: .32, matchIn: .6, nextId: 1,
-    protection: 0, bubbles: [], player: { x: width / 2, y: height / 2, radius, color: Math.floor(random() * 7) % 7 }, events: [] };
+    protection: 0, feastRemaining: 0, itemSpawnIn: 6 + random() * 2, pickups: [], bubbles: [], player: { x: width / 2, y: height / 2, radius, color: Math.floor(random() * 7) % 7 }, events: [] };
 }
 export function resizeBubbleGame(state, width, height) {
   const sx = width / state.width, sy = height / state.height;
   const radius = Math.max(15, Math.min(25, Math.min(width, height) * .045));
-  for (const entity of [state.player, ...state.bubbles]) { entity.x *= sx; entity.y *= sy; entity.radius = entity === state.player ? radius : radius * .84; }
+  for (const entity of [state.player, ...state.bubbles, ...state.pickups]) {
+    entity.x = Math.max(radius, Math.min(width - radius, entity.x * sx)); entity.y = Math.max(radius, Math.min(height - radius, entity.y * sy));
+    entity.radius = entity === state.player ? radius : entity.type ? radius * .9 : radius * .84;
+  }
   state.width = width; state.height = height;
   state.player.x = Math.max(radius, Math.min(width - radius, state.player.x)); state.player.y = Math.max(radius, Math.min(height - radius, state.player.y));
+}
+function spawnPickup(state) {
+  const { random, width, height, player } = state, roll = random(), type = roll < .52 ? 'heart' : roll < .8 ? 'feast' : 'bomb', radius = player.radius * .9;
+  let x, y, safe = false;
+  for (let i = 0; i < 20; i++) {
+    x = radius + 12 + random() * (width - radius * 2 - 24); y = radius + 12 + random() * (height - radius * 2 - 24);
+    if (Math.hypot(x - player.x, y - player.y) > player.radius + radius + Math.min(type === 'bomb' ? 110 : 70, Math.min(width, height) * .2)
+      && state.pickups.every(p => Math.hypot(x - p.x, y - p.y) > radius * 3)) { safe = true; break; }
+  }
+  if (!safe) return; // Never put a bomb under the player, even in a cramped arena.
+  const angle = random() * Math.PI * 2, speed = 9 + random() * 8;
+  state.pickups.push({ id: state.nextId++, type, x, y, radius, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, age: 0, ttl: type === 'bomb' ? 12 : 18 });
+}
+function moveEntity(entity, state, dt) {
+  entity.age += dt; entity.x += entity.vx * dt; entity.y += entity.vy * dt;
+  for (const [axis, velocity, size] of [['x', 'vx', state.width], ['y', 'vy', state.height]]) {
+    if (entity[axis] < entity.radius || entity[axis] > size - entity.radius) { entity[velocity] *= -1; entity[axis] = Math.max(entity.radius, Math.min(size - entity.radius, entity[axis])); }
+  }
 }
 function spawnBubble(state, forcedColor) {
   const { random, width, height, player } = state, radius = player.radius * .84;
@@ -87,16 +135,37 @@ export function stepBubbleGame(state, input = {}, dt = 0) {
   if (state.status !== 'playing' || !Number.isFinite(dt)) return state.events;
   dt = Math.max(0, Math.min(dt, .05)); if (!dt) return state.events;
   state.elapsed += dt; state.protection = Math.max(0, state.protection - dt);
+  state.feastRemaining = Math.max(0, state.feastRemaining - dt);
   let dx = Number.isFinite(input.x) ? input.x : 0, dy = Number.isFinite(input.y) ? input.y : 0;
   const player = state.player;
+  const speed = Math.max(175, Math.min(275, state.width * .4));
   if (input.target && Number.isFinite(input.target.x) && Number.isFinite(input.target.y)) {
     dx = input.target.x - player.x; dy = input.target.y - player.y;
-    const length = Math.hypot(dx, dy); if (length > 3) { dx /= length; dy /= length; } else { dx = 0; dy = 0; }
+    const length = Math.hypot(dx, dy);
+    if (length > 3) { const amount = Math.min(1, length / (speed * dt)); dx = dx / length * amount; dy = dy / length * amount; }
+    else { dx = 0; dy = 0; }
   }
   const norm = Math.hypot(dx, dy); if (norm > 1) { dx /= norm; dy /= norm; }
-  const speed = Math.max(175, Math.min(275, state.width * .4));
   player.x = Math.max(player.radius, Math.min(state.width - player.radius, player.x + dx * speed * dt));
   player.y = Math.max(player.radius, Math.min(state.height - player.radius, player.y + dy * speed * dt));
+  state.itemSpawnIn -= dt;
+  if (state.itemSpawnIn <= 0) { if (state.pickups.length < 3) spawnPickup(state); state.itemSpawnIn = 6 + state.random() * 4; }
+  for (const pickup of state.pickups) moveEntity(pickup, state, dt);
+  state.pickups = state.pickups.filter(p => p.age < p.ttl);
+  const contacts = state.pickups.filter(p => p.age >= .55 && Math.hypot(p.x - player.x, p.y - player.y) < (p.radius + player.radius) * .84);
+  const bomb = contacts.find(p => p.type === 'bomb');
+  if (bomb) {
+    bomb.eaten = true; state.lives = 0; state.status = 'over'; state.deathReason = 'bomb';
+    state.pickups = state.pickups.filter(p => !p.eaten);
+    state.events.push({ type: 'bomb', x: bomb.x, y: bomb.y, color: player.color }, { type: 'over', reason: 'bomb', x: player.x, y: player.y, color: player.color });
+    return state.events;
+  }
+  for (const pickup of contacts) {
+    pickup.eaten = true;
+    if (pickup.type === 'heart') { const gained = state.lives < MAX_LIVES; state.lives = Math.min(MAX_LIVES, state.lives + 1); state.events.push({ type: 'heal', gained, x: pickup.x, y: pickup.y, color: 0 }); }
+    else if (pickup.type === 'feast') { state.feastRemaining = FEAST_SECONDS; state.events.push({ type: 'feast', x: pickup.x, y: pickup.y, color: player.color }); }
+  }
+  state.pickups = state.pickups.filter(p => !p.eaten);
   state.spawnIn -= dt;
   state.matchIn -= dt;
   const capacity = Math.max(15, Math.min(32, Math.floor(state.width * state.height / 14000)));
@@ -123,7 +192,7 @@ export function stepBubbleGame(state, input = {}, dt = 0) {
     if (bubble.y < bubble.radius || bubble.y > state.height - bubble.radius) { bubble.vy *= -1; bubble.y = Math.max(bubble.radius, Math.min(state.height - bubble.radius, bubble.y)); }
     if (bubble.age < .3 || Math.hypot(bubble.x - player.x, bubble.y - player.y) > (bubble.radius + player.radius) * .84) continue;
     const position = { x: bubble.x, y: bubble.y, color: bubble.color };
-    if (bubble.color === player.color) {
+    if (bubble.color === player.color || state.feastRemaining > 0) {
       bubble.eaten = true; state.score++; state.peak = Math.max(state.peak, state.score);
       state.events.push({ type: 'eat', score: state.score, ...position });
     } else if (state.protection <= 0) {

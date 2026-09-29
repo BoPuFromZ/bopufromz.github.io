@@ -29,7 +29,8 @@ test('a stored mute preference prevents sound until the user enables it', async 
   try { audio.open(); await audio.startRound(); assert.equal(prepared, false); assert.equal(audio.enabled, false); await audio.toggle(); assert.equal(prepared, true); assert.equal(audio.playing, true); }
   finally { audio.close(); }
 });
-test('score, hurt, pop, death and reward each schedule a distinct cue', () => {
-  const patterns = ['score','hurt','pop','death','unlock'].map(name => { const ctx = fakeContext(); scheduleCue(ctx, ctx.destination, name); assert.ok(ctx.starts.length > 0); return JSON.stringify(ctx.starts); });
-  assert.equal(new Set(patterns).size, 5);
+test('collisions, rewards and the three pickups each schedule a distinct cue', () => {
+  const cues = ['score','hurt','pop','death','unlock','heal','feast','bomb'];
+  const patterns = cues.map(name => { const ctx = fakeContext(); scheduleCue(ctx, ctx.destination, name); assert.ok(ctx.starts.length > 0); return JSON.stringify(ctx.starts); });
+  assert.equal(new Set(patterns).size, cues.length);
 });
