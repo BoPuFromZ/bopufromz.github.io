@@ -2,6 +2,8 @@
 
 Three.js 构建的原创三维车库，包含游戏开发、音乐制作、动画制作、复古改装车和训练区。HTML / CSS 提供内容面板与手机布局。
 
+训练区 `#fitness` 进入三维硬拉台：200 公斤杠铃与关节小人，通过步骤按钮依次演示站位、屈髋屈膝抓杠、预拉、拉起、放下。动作进行时不会跳步，可以随时重置，并切换正面、侧面和环绕视角；手机提供同样的触摸步骤面板。原有训练内容保留在“训练记录”入口（`#fitnesslog`）。动作时序与双手、杠铃的运动一致性由 `src/fitness-motion.test.js` 验证。
+
 主页地址：https://bopufromz.github.io/
 
 源码仓库：https://github.com/BoPuFromZ/bopufromz.github.io

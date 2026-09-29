@@ -29,11 +29,37 @@ let motion = !matchMedia('(prefers-reduced-motion:reduce)').matches, day = false
 let motorClub = null, carActive = false, carOwnsHistory = false, carOpening = 0, carPreviousFocus = null;
 let musicStage = null, musicAudio = null, musicActive = false, musicOwnsHistory = false, musicOpening = 0, musicPreviousFocus = null;
 let bubbleGarden = null, gameActive = false, gameOwnsHistory = false, gameOpening = 0, gamePreviousFocus = null;
-const validPanels = new Set([...Object.keys(sections), 'musicworks', 'about', 'contact', 'collection', 'help']);
+let fitnessStage = null, fitnessActive = false, fitnessOwnsHistory = false, fitnessOpening = 0, fitnessPreviousFocus = null;
+const validPanels = new Set([...Object.keys(sections), 'musicworks', 'fitnesslog', 'about', 'contact', 'collection', 'help']);
 
-function updateAmbience() { if (audioGain) audioGain.gain.setTargetAtTime(document.hidden || muted || musicActive || gameActive ? 0 : .16, audio.currentTime, .2); }
+function updateAmbience() { if (audioGain) audioGain.gain.setTargetAtTime(document.hidden || muted || musicActive || gameActive || fitnessActive ? 0 : .16, audio.currentTime, .2); }
+async function openFitness({ updateHistory = true } = {}) {
+  if (fitnessActive) return;
+  closeGame({ updateHistory: false }); closeMusic({ updateHistory: false }); closeCar({ updateHistory: false }); closePanel({ updateHistory: false });
+  fitnessPreviousFocus = document.activeElement; fitnessActive = true;
+  const token = ++fitnessOpening; garage?.setActive(false); document.body.style.overflow = 'hidden'; updateAmbience();
+  if (updateHistory) { history.pushState({ garagePanel: 'fitness' }, '', '#fitness'); fitnessOwnsHistory = true; }
+  toast('正在打开硬拉台…');
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+    if (!fitnessStage) {
+      const { createFitnessStage } = await import('./fitness.js');
+      if (token !== fitnessOpening) return;
+      fitnessStage = createFitnessStage({ onExit: () => closeFitness(), onRecords: () => openPanel('fitnesslog') });
+    }
+    if (token === fitnessOpening) { fitnessStage.open(); $('#toast').hidden = true; }
+  } catch (error) { console.error('Could not enter training bay:', error); closeFitness(); toast('暂时无法打开训练区，请重新试一次。'); }
+}
+function closeFitness({ updateHistory = true } = {}) {
+  if (!fitnessActive) return;
+  ++fitnessOpening; fitnessActive = false; fitnessStage?.close(); document.body.style.overflow = '';
+  garage?.setActive(!panel.open && !carActive && !musicActive && !gameActive); updateAmbience();
+  if (updateHistory) { if (fitnessOwnsHistory) history.back(); else history.replaceState(null, '', location.pathname + location.search); }
+  fitnessOwnsHistory = false; if (fitnessPreviousFocus?.isConnected) fitnessPreviousFocus.focus({ preventScroll: true });
+}
 async function openGame({ updateHistory = true } = {}) {
   if (gameActive) return;
+  closeFitness({ updateHistory: false });
   closeMusic({ updateHistory: false }); closeCar({ updateHistory: false }); closePanel({ updateHistory: false });
   gamePreviousFocus = document.activeElement; gameActive = true;
   const token = ++gameOpening; garage?.setActive(false); document.body.style.overflow = 'hidden'; updateAmbience();
@@ -52,12 +78,13 @@ async function openGame({ updateHistory = true } = {}) {
 function closeGame({ updateHistory = true } = {}) {
   if (!gameActive) return;
   ++gameOpening; gameActive = false; bubbleGarden?.close(); document.body.style.overflow = '';
-  garage?.setActive(!panel.open && !carActive && !musicActive); updateAmbience();
+  garage?.setActive(!panel.open && !carActive && !musicActive && !fitnessActive); updateAmbience();
   if (updateHistory) { if (gameOwnsHistory) history.back(); else history.replaceState(null, '', location.pathname + location.search); }
   gameOwnsHistory = false; if (gamePreviousFocus?.isConnected) gamePreviousFocus.focus({ preventScroll: true });
 }
 async function openMusic({ updateHistory = true } = {}) {
   if (musicActive) return;
+  closeFitness({ updateHistory: false });
   closeGame({ updateHistory: false }); closeCar({ updateHistory: false }); closePanel({ updateHistory: false });
   musicPreviousFocus = document.activeElement; musicActive = true;
   const token = ++musicOpening;
@@ -78,13 +105,14 @@ async function openMusic({ updateHistory = true } = {}) {
 function closeMusic({ updateHistory = true } = {}) {
   if (!musicActive) return;
   ++musicOpening; musicActive = false; musicAudio?.close(); musicStage?.close();
-  document.body.style.overflow = ''; garage?.setActive(!panel.open && !carActive && !gameActive); updateAmbience();
+  document.body.style.overflow = ''; garage?.setActive(!panel.open && !carActive && !gameActive && !fitnessActive); updateAmbience();
   if (updateHistory) { if (musicOwnsHistory) history.back(); else history.replaceState(null, '', location.pathname + location.search); }
   musicOwnsHistory = false; if (musicPreviousFocus?.isConnected) musicPreviousFocus.focus({ preventScroll: true });
 }
 
 async function openCar({ updateHistory = true } = {}) {
   if (carActive) return;
+  closeFitness({ updateHistory: false });
   closeGame({ updateHistory: false });
   closeMusic({ updateHistory: false });
   if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
@@ -104,7 +132,7 @@ async function openCar({ updateHistory = true } = {}) {
 }
 function closeCar({ updateHistory = true } = {}) {
   if (!carActive) return;
-  ++carOpening; carActive = false; motorClub?.close(); document.body.style.overflow = ''; garage?.setActive(!panel.open && !musicActive && !gameActive);
+  ++carOpening; carActive = false; motorClub?.close(); document.body.style.overflow = ''; garage?.setActive(!panel.open && !musicActive && !gameActive && !fitnessActive);
   if (updateHistory) { if (carOwnsHistory) history.back(); else history.replaceState(null, '', location.pathname + location.search); }
   carOwnsHistory = false; if (carPreviousFocus?.isConnected) carPreviousFocus.focus({ preventScroll: true });
 }
@@ -122,11 +150,12 @@ function sectionMarkup(id) {
   return heading(s.title, s.english, id) + `<p class="panel-lead">${escape(s.subtitle)}</p>` + (s.description ? `<p class="panel-description">${escape(s.description)}</p>` : '') + (s.tools.length ? `<div class="tags">${s.tools.map(t => `<span>${escape(t)}</span>`).join('')}</div>` : '') + (s.stats ? `<div class="stats-grid">${s.stats.map(stat => `<div class="stat"><strong>${escape(stat.value)}</strong>${stat.unit ? `<span class="unit">${escape(stat.unit)}</span>` : ''}<p>${escape(stat.label)}</p></div>`).join('')}</div><article class="training-record"><h3>${escape(s.record.title)}</h3><p>${escape(s.record.text)}</p></article>` : '') + worksMarkup(s);
 }
 function render(id) {
-  const section = sections[id === 'musicworks' ? 'music' : id];
+  const sectionId = id === 'musicworks' ? 'music' : id === 'fitnesslog' ? 'fitness' : id;
+  const section = sections[sectionId];
   panel.style.setProperty('--accent', section?.color || '#d4ee8c');
   $('#panel-kicker').textContent = section ? `${section.number} / ${section.english}` : `AFTERHOURS / ${id.toUpperCase()}`;
   let html;
-  if (section) html = sectionMarkup(id === 'musicworks' ? 'music' : id);
+  if (section) html = sectionMarkup(sectionId);
   else if (id === 'about') html = heading(profile.name || '关于这个车库', 'ONE PERSON. MANY POSSIBILITIES.') + `<div class="about-wordmark">AFTER HOURS<span style="color:#ffb46e">.</span></div><p class="panel-lead">灵感不打烊。<br>这里收藏五种热爱，也留着许多新的可能。</p>${profile.introduction ? `<p class="panel-description">${escape(profile.introduction)}</p>` : '<div class="about-blank" aria-label="个人介绍留白"></div>'}<div class="about-lanes">${Object.values(sections).map(s => `<span>${escape(s.title)}</span>`).join('')}</div>${profile.location ? `<p class="panel-description">${escape(profile.location)}</p>` : ''}`;
   else if (id === 'collection') html = heading('作品索引', 'FIVE DIRECTIONS. KEEP EXPLORING.') + `<p class="panel-lead">选择一个方向，看看正在发生的事。</p><div class="index-grid">${Object.entries(sections).map(([key, s]) => `<button class="index-card" data-panel="${key}" style="--accent:${s.color}"><span class="index-num">${s.number}</span><span class="index-arrow">↗</span><h3>${escape(s.title)}</h3><p>${escape(s.english)}</p></button>`).join('')}</div>`;
   else if (id === 'contact') html = heading('来聊聊', 'GOOD IDEAS START WITH A HELLO.') + `<p class="panel-lead">关于游戏、声音、影像，<br>或者聊聊你正在做的有趣的事。</p>` + [{ label: 'GITHUB', url: profile.github, name: profile.github?.split('/').filter(Boolean).pop() }, ...(profile.email ? [{ label: 'EMAIL', url: `mailto:${profile.email}`, name: profile.email }] : []), ...profile.links].filter(l => safeUrl(l.url)).map(l => `<a class="contact-link" href="${escape(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer"><span><small>${escape(l.label)}</small><strong>${escape(l.name || l.url)}</strong></span><span>↗</span></a>`).join('');
@@ -140,6 +169,8 @@ async function openPanel(id, { updateHistory = true } = {}) {
   if (id === 'car') return openCar({ updateHistory });
   if (id === 'music') return openMusic({ updateHistory });
   if (id === 'game') return openGame({ updateHistory });
+  if (id === 'fitness') return openFitness({ updateHistory });
+  closeFitness({ updateHistory: false });
   closeGame({ updateHistory: false });
   closeMusic({ updateHistory: false });
   closeCar({ updateHistory: false });
@@ -154,7 +185,7 @@ async function openPanel(id, { updateHistory = true } = {}) {
 }
 function closePanel({ updateHistory = true } = {}) {
   if (!panel.open) return;
-  panel.close(); activePanel = null; document.body.style.overflow = ''; garage?.setActive(!gameActive && !carActive && !musicActive);
+  panel.close(); activePanel = null; document.body.style.overflow = ''; garage?.setActive(!gameActive && !carActive && !musicActive && !fitnessActive);
   document.querySelectorAll('.destinations [data-panel]').forEach(el => el.removeAttribute('aria-current'));
   if (updateHistory) { if (ownsHistory) history.back(); else history.replaceState(null, '', location.pathname + location.search); }
   ownsHistory = false; if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
@@ -164,8 +195,8 @@ $('#close-panel').addEventListener('click', () => closePanel());
 $('#back-garage').addEventListener('click', () => closePanel());
 panel.addEventListener('cancel', e => { e.preventDefault(); closePanel(); });
 panel.addEventListener('click', e => { if (e.target === panel) { const r = panel.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closePanel(); } });
-window.addEventListener('popstate', () => { const id = location.hash.slice(1); if (validPanels.has(id)) openPanel(id, { updateHistory: false }); else { closeGame({ updateHistory: false }); closeMusic({ updateHistory: false }); closeCar({ updateHistory: false }); closePanel({ updateHistory: false }); } });
-$('.brand').addEventListener('click', e => { e.preventDefault(); closeGame(); closeMusic(); closeCar(); closePanel(); garage?.reset(); });
+window.addEventListener('popstate', () => { const id = location.hash.slice(1); if (validPanels.has(id)) openPanel(id, { updateHistory: false }); else { closeFitness({ updateHistory: false }); closeGame({ updateHistory: false }); closeMusic({ updateHistory: false }); closeCar({ updateHistory: false }); closePanel({ updateHistory: false }); } });
+$('.brand').addEventListener('click', e => { e.preventDefault(); closeFitness(); closeGame(); closeMusic(); closeCar(); closePanel(); garage?.reset(); });
 $('#help-button').addEventListener('click', () => openPanel('help'));
 
 function toast(message) { clearTimeout(toastTimer); $('#toast').textContent = message; $('#toast').hidden = false; toastTimer = setTimeout(() => { $('#toast').hidden = true; }, 2600); }
@@ -206,7 +237,7 @@ $('#scene-host').addEventListener('scene-error', () => sceneError('WebGL context
 try {
   const { createGarage } = await import('./scene.js');
   garage = createGarage({ mount: $('#scene-host'), hotspots: $('#hotspots'), reduced: !motion, onOpen: openPanel,
-    onReady() { $('#scene-loading').classList.add('loaded'); setTimeout(() => { $('#scene-loading').hidden = true; }, 650); document.body.dataset.sceneReady = 'true'; if (panel.open || carActive || musicActive || gameActive) garage?.setActive(false); },
+    onReady() { $('#scene-loading').classList.add('loaded'); setTimeout(() => { $('#scene-loading').hidden = true; }, 650); document.body.dataset.sceneReady = 'true'; if (panel.open || carActive || musicActive || gameActive || fitnessActive) garage?.setActive(false); },
     onHover(id) { const tooltip = $('#scene-tooltip'); tooltip.hidden = !id; if (id) tooltip.textContent = `点击探索 ${sections[id].title} ↗`; },
   });
 } catch (error) { sceneError(error); }
