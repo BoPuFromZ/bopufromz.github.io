@@ -33,7 +33,8 @@ export function createDj() {
     return { side, upper: bone(.135, clothing), lower: bone(.095, skin), hand, shoulder: new THREE.Vector3(), elbow: new THREE.Vector3(), target: new THREE.Vector3(side * 1.09, 1.11, .95), desired: new THREE.Vector3(), bend: new THREE.Vector3() };
   });
   const legs = [-1, 1].map(side => ({ side, upper: bone(.14, black), lower: bone(.12, black), hip: new THREE.Vector3(), knee: new THREE.Vector3(), ankle: new THREE.Vector3(), shoe: box(.34, .18, .55, mint, side * .23, .13, .13) }));
-  const smooth = { hipY: .83, hipX: 0, lean: 0, twist: 0, forward: -.05, nod: 0, headTilt: 0, headTurn: 0, shoulderPop: 0, jump: 0 };
+  const smooth = { hipY: .83, hipX: 0, lean: 0, twist: 0, forward: -.05, nod: 0, headTilt: 0, headTurn: 0, shoulderPop: 0, shoulderRoll: 0, jump: 0 };
+  const recordOffsets = [0, 0];
   let scratchLeft = true, scratchOffset = 0;
   function update(groove, dt, enabled = true) {
     const pose = getDjPose(groove, enabled), weight = 1 - Math.exp(-Math.min(dt, .1) * 22);
@@ -45,15 +46,17 @@ export function createDj() {
     group.updateMatrixWorld(true);
     for (const leg of legs) {
       leg.hip.set(leg.side * .23, 0, 0).applyMatrix4(torso.matrix);
-      leg.ankle.set(leg.side * .23, .17 + smooth.jump * .26, .08);
+      const lift = pose.mode === 7 ? .43 : .26;
+      leg.ankle.set(leg.side * .23, .17 + smooth.jump * lift, .08);
       leg.knee.copy(leg.hip).lerp(leg.ankle, .52); leg.knee.z += .14 + Math.max(0, .83 - smooth.hipY) * .5;
       placeBone(leg.upper, leg.hip, leg.knee); placeBone(leg.lower, leg.knee, leg.ankle);
-      leg.shoe.position.y = .13 + smooth.jump * .26; leg.shoe.rotation.x = -smooth.jump * .1;
+      leg.shoe.position.y = .13 + smooth.jump * lift; leg.shoe.rotation.x = -smooth.jump * .1;
     }
     for (const arm of arms) {
-      const scratchHand = (arm.side < 0) === pose.recordLeft;
-      arm.shoulder.set(arm.side * .37, .79 + smooth.shoulderPop, 0).applyMatrix4(torso.matrix);
-      if (scratchHand) arm.desired.set(arm.side * 1.09, 1.115, .95 + pose.scratch);
+      const scratchHand = !pose.bothHype && (pose.bothDecks || (arm.side < 0) === pose.recordLeft);
+      const stroke = arm.side < 0 ? pose.strokeLeft : pose.strokeRight;
+      arm.shoulder.set(arm.side * .37, .79 + smooth.shoulderPop + arm.side * smooth.shoulderRoll, 0).applyMatrix4(torso.matrix);
+      if (scratchHand) arm.desired.set(arm.side * 1.09, 1.115, .95 + stroke);
       else arm.desired.set(arm.side * .15 + pose.fader, 1.145, 1.11);
       if (!scratchHand && pose.headphone > .05) {
         const ear = new THREE.Vector3(arm.side * .38, .03, .02).applyMatrix4(head.matrix).applyMatrix4(torso.matrix);
@@ -62,6 +65,11 @@ export function createDj() {
       if (!scratchHand && pose.hype > .05) {
         const raised = new THREE.Vector3(arm.side * .8, 2.9 + smooth.jump * .2, .05);
         arm.desired.lerp(raised, pose.hype);
+      }
+      if (pose.bothHype) {
+        const spread = pose.mode === 8 ? .7 - pose.clap * .64 : .78 + Math.sin((groove?.phase || 0) * Math.PI) * .18;
+        const raised = new THREE.Vector3(arm.side * spread, 2.95 + smooth.jump * .38 + pose.clap * .1, .16);
+        arm.desired.lerp(raised, pose.crowd);
       }
       arm.target.lerp(arm.desired, 1 - Math.exp(-Math.min(dt, .1) * 25));
       const reach = new THREE.Vector3().subVectors(arm.target, arm.shoulder), distance = Math.min(reach.length(), 1.495);
@@ -72,10 +80,12 @@ export function createDj() {
       arm.bend.set(arm.side, -.3, -.3).addScaledVector(reach, -new THREE.Vector3(arm.side, -.3, -.3).dot(reach)).normalize();
       arm.elbow.copy(arm.shoulder).addScaledVector(reach, along).addScaledVector(arm.bend, height);
       placeBone(arm.upper, arm.shoulder, arm.elbow); placeBone(arm.lower, arm.elbow, arm.hand.position);
-      arm.hand.rotation.set(scratchHand ? pose.scratch * 1.5 : -pose.hype * .7, 0, scratchHand ? arm.side * .15 : pose.hype * arm.side * .4);
+      arm.hand.rotation.set(scratchHand ? stroke * 1.5 : -(pose.hype + pose.crowd) * .7, 0, scratchHand ? arm.side * .15 : (pose.hype * .4 + pose.clap * 1.1) * arm.side);
     }
     scratchLeft = pose.recordLeft; scratchOffset += (pose.scratch * 3.5 - scratchOffset) * weight;
-    return { scratchLeft, scratchOffset, active: pose.active };
+    recordOffsets[0] += (pose.strokeLeft * pose.recordScale - recordOffsets[0]) * weight;
+    recordOffsets[1] += (pose.strokeRight * pose.recordScale - recordOffsets[1]) * weight;
+    return { scratchLeft, scratchOffset, recordOffsets, active: pose.active };
   }
   update(null, 1, false);
   return { group, update };

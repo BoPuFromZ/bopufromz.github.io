@@ -53,3 +53,36 @@ test('jointed hands stay above the deck while the DJ jumps and leans', () => {
   assert.ok(Math.abs(dj.group.getObjectByName('dj-torso').position.y - .83) < .001);
   assert.ok(Math.abs(dj.group.getObjectByName('dj-head').rotation.x) < .001);
 });
+
+test('new phrases add double-deck scratching, shoulder bursts and two-hand crowd cues', () => {
+  const beat = { age: .04, strength: 1, phase: .1, drive: 1, pulse: .7 };
+  const rapid = getDjPose({ ...beat, count: 20 });
+  assert.ok(rapid.bothDecks); assert.ok(rapid.strokeLeft * rapid.strokeRight < 0);
+  const launch = getDjPose({ ...beat, count: 28 });
+  assert.ok(launch.bothHype); assert.ok(launch.hipY < .75);
+  assert.ok(getDjPose({ ...beat, age: .21, phase: .42, count: 28, pulse: .2 }).hipY > 1.25);
+  assert.ok(getDjPose({ ...beat, count: 24 }).shoulderRoll !== 0);
+  assert.ok(getDjPose({ ...beat, count: 32 }).clap > .7);
+  assert.ok(getDjPose({ ...beat, count: 36 }).recordScale > rapid.recordScale);
+});
+
+test('both-deck gestures contact the decks and crowd cues raise both hands', () => {
+  const dj = createDj(), beat = { age: .2, strength: 1, phase: .4, drive: 1, pulse: .2 };
+  for (let frame = 0; frame < 120; frame++) dj.update({ ...beat, count: 20 }, 1 / 60);
+  for (const name of ['dj-hand-left', 'dj-hand-right']) {
+    const hand = dj.group.getObjectByName(name);
+    assert.ok(Math.abs(Math.abs(hand.position.x) - 1.09) < .1);
+    assert.ok(Math.abs(hand.position.y - 1.115) < .1);
+  }
+  for (let frame = 0; frame < 120; frame++) dj.update({ ...beat, count: 28 }, 1 / 60);
+  for (const name of ['dj-hand-left', 'dj-hand-right']) assert.ok(dj.group.getObjectByName(name).position.y > 2.7);
+  for (let frame = 0; frame < 120; frame++) dj.update({ ...beat, age: .04, phase: .08, count: 32 }, 1 / 60);
+  const left = dj.group.getObjectByName('dj-hand-left'), right = dj.group.getObjectByName('dj-hand-right');
+  assert.ok(left.position.y > 2.5 && right.position.y > 2.5);
+  assert.ok(left.position.distanceTo(right.position) < .24, 'Palms should meet above the head on the clap beat');
+  for (const count of [20, 24, 28, 32, 36]) {
+    for (let frame = 0; frame < 120; frame++) dj.update({ ...beat, count }, 1 / 60, false);
+    assert.ok(Math.abs(dj.group.getObjectByName('dj-torso').position.y - .83) < .001);
+    for (const name of ['dj-hand-left', 'dj-hand-right']) assert.ok(dj.group.getObjectByName(name).position.y < 1.3);
+  }
+});

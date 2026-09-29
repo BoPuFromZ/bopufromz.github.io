@@ -56,23 +56,38 @@ export function getDjPose(groove, enabled = true) {
   const jumpPhase = clamp((age - .035) / .36, 0, 1);
   const jump = Math.sin(jumpPhase * Math.PI) ** 2 * strength * amount;
   const swing = Math.sin(phase * Math.PI) * side * amount;
-  const scratch = Math.sin(phase * Math.PI * 4) * amount;
-  // Four-beat phrases alternate deck work, headphone listening and crowd cues.
-  const mode = Math.floor(count / 4) % 5;
+  // Preserve the first five phrases, then add performance bursts on the same
+  // detected beats. Quiet sections still scale every gesture back to rest.
+  const mode = Math.floor(count / 4) % 10;
+  const rapid = mode === 5, shoulders = mode === 6, launch = mode === 7;
+  const clap = mode === 8, backspin = mode === 9;
+  const scratch = Math.sin(phase * Math.PI * (rapid ? 8 : backspin ? 2 : 4)) * amount;
+  const bothDecks = rapid || shoulders && count % 4 === 3;
+  const bothHype = launch || clap;
+  const recordLeft = mode === 0 || mode === 2 || mode === 4 || mode === 5 || mode === 7 || mode === 8 || backspin && count % 2 === 0;
+  const stroke = scratch * (rapid ? .23 : backspin ? .24 : .16);
+  const shoulderRoll = shoulders ? swing * .17 : 0;
   return {
     mode, jump,
-    hipY: .83 + jump * .36 - pulse * amount * .11,
-    hipX: swing * .14,
-    lean: swing * .2, twist: swing * .28,
-    forward: -.05 - pulse * amount * .18,
-    nod: pulse * amount * .62 - jump * .2,
-    headTilt: swing * .17, headTurn: swing * .18,
+    hipY: .83 + jump * (launch ? .55 : backspin ? .4 : .36) - pulse * amount * (launch || shoulders ? .23 : .11),
+    hipX: swing * (shoulders || backspin ? .22 : .14),
+    lean: swing * (shoulders ? .34 : backspin ? .3 : .2), twist: swing * (shoulders ? .48 : backspin ? .4 : .28),
+    forward: -.05 - pulse * amount * (launch ? .25 : .18),
+    nod: pulse * amount * (rapid || shoulders || launch ? .8 : .62) - jump * .2,
+    headTilt: swing * (shoulders ? .28 : .17), headTurn: swing * (backspin ? .35 : .18),
     shoulderPop: pulse * amount * .12,
-    scratch: scratch * .16,
+    shoulderRoll,
+    scratch: stroke,
+    strokeLeft: (bothDecks || recordLeft) && !bothHype ? stroke : 0,
+    strokeRight: (bothDecks || !recordLeft) && !bothHype ? stroke * (bothDecks ? -1 : 1) : 0,
+    recordScale: backspin ? 11 : rapid ? 6 : 3.5,
+    bothDecks, bothHype,
+    crowd: bothHype ? amount * (.82 + .18 * Math.sin(phase * Math.PI)) : 0,
+    clap: clap ? amount * Math.exp(-Math.max(0, age - .14) / .16) : 0,
     hype: mode === 4 ? amount * (.65 + .35 * Math.sin(phase * Math.PI)) : 0,
     headphone: mode === 2 || mode === 3 ? amount : 0,
     fader: Math.sin(phase * Math.PI * 2) * amount * .12,
-    recordLeft: mode === 0 || mode === 2 || mode === 4,
+    recordLeft,
     active: amount,
   };
 }

@@ -171,7 +171,7 @@ export function createMusicWorld({ mount, audio, onError }) {
     controls.update();
     const gesture = dj.update(signal.groove, motionDt, moving && signal.playing);
     for (let i = 0; i < records.length; i++) {
-      if (signal.playing && moving) records[i].rotation.y = audio.media.currentTime * 1.8 + (gesture.scratchLeft === (i === 0) ? gesture.scratchOffset : 0);
+      if (signal.playing && moving) records[i].rotation.y = audio.media.currentTime * 1.8 + gesture.recordOffsets[i];
     }
     for (let i = 0; i < beams.length; i++) {
       const beam = beams[i], phase = beam.phase;
