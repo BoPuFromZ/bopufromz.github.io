@@ -19,7 +19,7 @@ export function createGarage({ mount, hotspots, onOpen, onReady, onHover, reduce
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.domElement.setAttribute('aria-label', '三维创作车库。拖动旋转，滚轮缩放。点击汽车、音乐台、游戏电脑、动画屏幕或健身器械探索。方向键旋转，Home 恢复视角。');
   renderer.domElement.tabIndex = 0;
   mount.append(renderer.domElement);
@@ -381,7 +381,8 @@ export function createGarage({ mount, hotspots, onOpen, onReady, onHover, reduce
     if (e.key === 'Home') { reset(); e.preventDefault(); }
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) { const offset = camera.position.clone().sub(controls.target), sph = new THREE.Spherical().setFromVector3(offset); if (e.key === 'ArrowLeft') sph.theta -= .08; if (e.key === 'ArrowRight') sph.theta += .08; if (e.key === 'ArrowUp') sph.phi -= .06; if (e.key === 'ArrowDown') sph.phi += .06; sph.theta = THREE.MathUtils.clamp(sph.theta, controls.minAzimuthAngle, controls.maxAzimuthAngle); sph.phi = THREE.MathUtils.clamp(sph.phi, controls.minPolarAngle, controls.maxPolarAngle); camera.position.copy(new THREE.Vector3().setFromSpherical(sph).add(controls.target)); controls.update(); e.preventDefault(); }
   });
-  const resizeObserver = new ResizeObserver(() => { camera.aspect = width() / height(); camera.updateProjectionMatrix(); renderer.setSize(width(), height()); composer?.setSize(width(), height()); updateLabels(); }); resizeObserver.observe(mount);
+  // Resizing clears the canvas; schedule a new frame even when motion is paused.
+  const resizeObserver = new ResizeObserver(() => { camera.aspect = width() / height(); camera.updateProjectionMatrix(); renderer.setSize(width(), height()); composer?.setSize(width(), height()); updateLabels(); renderDirty = true; }); resizeObserver.observe(mount);
   let motion = !reduced, daytime = false, enabled = true, disposed = false, elapsed = 0, last = performance.now(), lastRender = 0, frame;
   let frames = 0;
   function animate(now) {
