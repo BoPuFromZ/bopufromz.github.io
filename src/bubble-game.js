@@ -1,7 +1,8 @@
 import './bubble-game.css';
-import { COLORS, REWARDS, createBubbleGame, resizeBubbleGame, stepBubbleGame, loadBag, saveBag, unlockRewards, useReward, openGift } from './bubble-core.js';
-import { drawCharacter, drawBackground, avatarImage, skyImage, star, GIFT_SVG, DURIAN_SVG } from './bubble-art.js';
+import { COLORS, REWARDS, rewardPresentation, createBubbleGame, resizeBubbleGame, stepBubbleGame, loadBag, saveBag, unlockRewards, useReward, openGift } from './bubble-core.js';
+import { drawCharacter, drawBackground, avatarImage, skyImage, star, GIFT_SVG, DURIAN_SVG, MYSTERY_SVG } from './bubble-art.js';
 import { createFireworks } from './bubble-fx.js';
+import { createBubbleAudio } from './bubble-audio.js';
 
 export function createBubbleGarden({ onExit, random = Math.random }) {
   const dialog = document.createElement('dialog'); dialog.id = 'bubble-garden'; dialog.setAttribute('aria-label', '游戏开发：七色泡泡花园');
@@ -13,12 +14,12 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
     <div class="bubble-layout bubble-chrome"><section class="bubble-board" aria-label="泡泡游戏场地"><div class="bubble-board-top"><span><i></i><b id="bubble-phase">等待开始</b></span><span id="bubble-color-name">开始后随机选择你的颜色</span><button data-action="pause" aria-label="暂停游戏" disabled>Ⅱ</button></div>
       <div class="bubble-arena"><canvas id="bubble-canvas" tabindex="0" aria-label="七色泡泡游戏。方向键或 WASD 移动，手机拖动或使用摇杆。同色加分，异色减分并损失生命。"></canvas>
         <div class="bubble-start"><div class="start-sticker"><img src="${art.bubble}" alt="微笑的天空蓝泡泡"/><span>LET'S PLAY!</span><i>✦</i></div><p class="bubble-eyebrow">SEVEN COLORS. ONE LITTLE ADVENTURE.</p><h1>同色相遇，<br>快乐<span>加分。</span></h1><p>吃掉和你一样颜色的泡泡。<br>避开其他颜色，收集藏在分数里的惊喜。</p><button class="bubble-primary" data-action="start">开始游戏 <span>→</span></button><small>3 条生命 · 5 个奖励 · 一点点好心情</small></div>
-        <div class="bubble-joystick" aria-label="手机移动摇杆" role="group"><div class="joystick-ring"><i></i><b>✦</b></div><span>移动</span></div>
+        <div class="bubble-joystick" aria-hidden="true"><div class="joystick-ring"><i></i><b>✦</b></div><span>移动</span></div>
         <div class="bubble-reward-toast" role="status" hidden><img alt=""/><div><small>NEW REWARD</small><strong></strong></div><button data-action="bag">去背包 ↗</button></div>
-      </div><footer class="bubble-board-footer"><div class="bubble-palette" aria-label="七种颜色的色号">${COLORS.map((c, i) => `<span style="--bubble-color:${c.hex}" title="${i + 1} / ${c.name}">${i + 1}</span>`).join('')}</div><span class="bubble-desktop-hint">方向键 / WASD 移动 · ESC 暂停</span><span class="bubble-mobile-hint">拖动移动 / 左下摇杆</span></footer>
+      </div><footer class="bubble-board-footer"><div class="bubble-palette" aria-label="七种颜色的色号">${COLORS.map((c, i) => `<span style="--bubble-color:${c.hex}" title="${i + 1} / ${c.name}">${i + 1}</span>`).join('')}</div><span class="bubble-desktop-hint">方向键 / WASD 移动 · ESC 暂停</span><span class="bubble-mobile-hint">按住任意位置，滑动摇杆移动</span></footer>
     </section><aside class="bubble-sidebar" aria-label="计分板和奖励进度"><div class="bubble-score-card"><div class="score-heading"><span>SCORE / 本局得分</span><i>✦</i></div><strong id="bubble-score">00</strong><div class="bubble-lives" aria-label="剩余 3 条生命">${heart.repeat(3)}</div><div class="bubble-small-stats"><span>本机最高 <b id="bubble-best">0</b></span><span>本局 <b id="bubble-time">00:00</b></span></div></div>
-      <div class="bubble-next-reward"><div><span>下一个小惊喜</span><b id="bubble-next-label">10 分</b></div><strong id="bubble-next-name">七色小青蛙</strong><div class="bubble-goal-meter"><i></i></div></div>
-      <div class="bubble-roadmap"><div class="roadmap-heading"><span>THE LITTLE REWARDS</span><span>01—05</span></div>${REWARDS.map((r, i) => `<div class="bubble-milestone" data-reward="${r.id}"><span class="milestone-number">${String(i + 1).padStart(2, '0')}</span><span class="milestone-copy"><strong>${r.name}</strong><small>${r.score} 分解锁</small></span><b>○</b></div>`).join('')}</div>
+      <div class="bubble-next-reward"><div><span>下一个小惊喜</span><b id="bubble-next-label">10 分</b></div><strong id="bubble-next-name">奖励一</strong><div class="bubble-goal-meter"><i></i></div></div>
+      <div class="bubble-roadmap"><div class="roadmap-heading"><span>THE LITTLE REWARDS</span><span>01—05</span></div>${REWARDS.map((r, i) => `<div class="bubble-milestone" data-reward="${r.id}"><span class="milestone-number">${String(i + 1).padStart(2, '0')}</span><span class="milestone-copy"><strong>${rewardPresentation({ unlocked: [] }, r).name}</strong><small>${r.score} 分解锁</small></span><b>○</b></div>`).join('')}</div>
       <div class="bubble-rules"><span>同色 <b>+1</b></span><span>异色 <b>−1</b> ${heart}</span><label><input id="bubble-numbers" type="checkbox" checked/> 色号辅助</label></div>
     </aside></div>
     <div class="bubble-bottom-note bubble-chrome"><span>01 / GAME DEVELOPMENT</span><span>STAY CURIOUS. PLAY A LITTLE.</span></div>
@@ -36,18 +37,15 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
   document.body.append(dialog);
   const $ = selector => dialog.querySelector(selector), shell = $('.bubble-shell'), canvas = $('#bubble-canvas'), arena = $('.bubble-arena'), ctx = canvas.getContext('2d'), layerRoot = $('.bubble-layer');
   const reduced = matchMedia('(prefers-reduced-motion:reduce)').matches;
-  let bag = loadBag(), state = null, open = false, layer = null, returnLayer = null, width = 1, height = 1, frame = null, last = 0, time = 0, lastHUD = 0, particles = [], floaters = [], pointerTarget = null, joystick = { x: 0, y: 0 }, stickPointer = null, arenaPointer = null, numbers = true;
-  let rewardToastTimer, noticeTimer, overTimer, giftTimer, fireworks = null, fireTime = 0, fireActive = false, audio = null, sound = false, lastFocus = null;
+  let bag = loadBag(), state = null, open = false, layer = null, returnLayer = null, width = 1, height = 1, frame = null, last = 0, time = 0, lastHUD = 0, particles = [], floaters = [], pointerTarget = null, joystick = { x: 0, y: 0 }, stickPointer = null, stickOrigin = null, arenaPointer = null, numbers = true;
+  let rewardToastTimer, noticeTimer, overTimer, giftTimer, fireworks = null, fireTime = 0, fireActive = false, lastFocus = null;
+  const audio = createBubbleAudio();
   const keys = new Set();
   function notify(text) { $('.bubble-notice').textContent = text; $('.bubble-notice').hidden = false; clearTimeout(noticeTimer); noticeTimer = setTimeout(() => { $('.bubble-notice').hidden = true; }, 2300); }
   function persist() { const saved = saveBag(bag); shell.dataset.bag = JSON.stringify(bag); $('.bag-storage-note').textContent = saved ? '解锁和外观保存在此浏览器' : '当前浏览器暂不支持保存，奖励保留在本次会话'; }
-  function tone(frequency, duration = .1, volume = .035, type = 'sine') {
-    if (!sound || !audio) return;
-    const oscillator = audio.createOscillator(), gain = audio.createGain(); oscillator.type = type; oscillator.frequency.setValueAtTime(frequency, audio.currentTime);
-    gain.gain.setValueAtTime(volume, audio.currentTime); gain.gain.exponentialRampToValueAtTime(.001, audio.currentTime + duration); oscillator.connect(gain); gain.connect(audio.destination); oscillator.start(); oscillator.stop(audio.currentTime + duration + .02);
-  }
+  function renderSound() { $('.bubble-sound span').textContent = audio.enabled ? 'ON' : 'OFF'; $('.bubble-sound').setAttribute('aria-pressed', String(audio.enabled)); $('.bubble-sound').setAttribute('aria-label', audio.enabled ? '关闭游戏音乐和音效' : '开启游戏音乐和音效'); shell.dataset.audio = JSON.stringify({ enabled: audio.enabled, playing: audio.playing, state: audio.contextState }); }
   async function toggleSound() {
-    try { audio ||= new (window.AudioContext || window.webkitAudioContext)(); await audio.resume(); sound = !sound; $('.bubble-sound span').textContent = sound ? 'ON' : 'OFF'; $('.bubble-sound').setAttribute('aria-pressed', String(sound)); $('.bubble-sound').setAttribute('aria-label', sound ? '关闭游戏声音' : '开启游戏声音'); if (sound) tone(660); }
+    try { await audio.toggle(); renderSound(); if (audio.enabled) audio.cue('equip'); }
     catch { notify('当前浏览器暂时无法播放声音。'); }
   }
   function burst(x, y, color, amount = 18, broken = false) {
@@ -56,22 +54,21 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
   function rewardToast(reward) {
     const el = $('.bubble-reward-toast'); el.querySelector('img').src = art[reward.id] || art.bubble; el.querySelector('strong').textContent = `解锁了 ${reward.name}`; el.hidden = false;
     clearTimeout(rewardToastTimer); rewardToastTimer = setTimeout(() => { el.hidden = true; }, 4300);
-    tone(523, .15); setTimeout(() => { if (open) tone(784, .22); }, 90);
+    audio.cue('unlock');
   }
   function updateInventoryUI() {
     const count = bag.unlocked.length + (bag.giftEarned ? 1 : 0);
     $('.bag-count').textContent = count; $('.bag-count-heading').textContent = `${count} / 5`;
     for (const reward of REWARDS) {
-      const owned = reward.id === 'gift' ? bag.giftEarned : bag.unlocked.includes(reward.id), row = $(`[data-reward="${reward.id}"]`);
-      row.classList.toggle('earned', owned); row.querySelector('b').textContent = owned ? '✓' : '○';
+      const view = rewardPresentation(bag, reward), row = $(`[data-reward="${reward.id}"]`);
+      row.classList.toggle('earned', view.owned); row.querySelector('b').textContent = view.owned ? '✓' : '○'; row.querySelector('strong').textContent = view.name;
     }
     $('.bag-grid').innerHTML = REWARDS.map(reward => {
-      const owned = reward.id === 'gift' ? bag.giftEarned : bag.unlocked.includes(reward.id);
+      const view = rewardPresentation(bag, reward), owned = view.owned;
       const active = reward.type === 'skin' ? bag.skin === reward.id : reward.id === 'sky' && bag.background === 'sky';
-      const picture = reward.id === 'gift' ? (bag.voucher ? DURIAN_SVG : GIFT_SVG) : `<img src="${art[reward.id]}" alt="${reward.name}"/>`;
-      const name = reward.id === 'gift' && owned && !bag.voucher ? '待拆的小礼盒' : reward.name;
+      const picture = !owned ? MYSTERY_SVG : reward.id === 'gift' ? (bag.voucher ? DURIAN_SVG : GIFT_SVG) : `<img src="${art[reward.id]}" alt="${view.name}"/>`;
       const label = !owned ? `${reward.score} 分解锁` : reward.id === 'gift' ? bag.voucher ? '查看兑换券' : '打开礼盒' : reward.id === 'sky' ? active ? '还原夜色' : '使用背景' : active ? '正在使用 ✓' : '使用外观';
-      return `<article class="bag-item ${owned ? 'owned' : 'locked'} ${active ? 'equipped' : ''}"><div class="bag-item-art">${picture}<span>${owned ? active ? 'IN USE' : 'UNLOCKED' : 'LOCKED'}</span></div><h3>${name}</h3><p>${reward.subtitle}</p><button data-item="${reward.id}" ${!owned || (active && reward.type === 'skin') ? 'disabled' : ''}>${label}</button></article>`;
+      return `<article class="bag-item ${owned ? 'owned' : 'locked'} ${active ? 'equipped' : ''}"><div class="bag-item-art">${picture}<span>${owned ? active ? 'IN USE' : 'UNLOCKED' : 'LOCKED'}</span></div><h3>${view.name}</h3><p>${view.subtitle}</p><button data-item="${reward.id}" ${!owned || (active && reward.type === 'skin') ? 'disabled' : ''}>${label}</button></article>`;
     }).join('');
     $('[data-action="original"]').disabled = bag.skin === 'bubble';
     shell.dataset.skin = bag.skin; shell.dataset.background = bag.background; shell.dataset.bag = JSON.stringify(bag);
@@ -84,16 +81,18 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
     const hearts = $('.bubble-lives'); hearts.setAttribute('aria-label', `剩余 ${lives} 条生命`); [...hearts.children].forEach((el, i) => el.classList.toggle('lost', i >= lives));
     if (state) { const color = COLORS[state.player.color]; $('#bubble-color-name').innerHTML = `<i style="background:${color.hex}"></i>你的颜色 · ${state.player.color + 1} / ${color.name}`; }
     const next = REWARDS.find(r => r.id === 'gift' ? !bag.giftEarned : !bag.unlocked.includes(r.id));
-    $('#bubble-next-label').textContent = next ? `${next.score} 分` : '已集齐'; $('#bubble-next-name').textContent = next ? next.name : '五份惊喜，都属于你。';
+    $('#bubble-next-label').textContent = next ? `${next.score} 分` : '已集齐'; $('#bubble-next-name').textContent = next ? rewardPresentation(bag, next).name : '五份惊喜，都属于你。';
     $('.bubble-goal-meter i').style.width = `${next ? Math.max(0, Math.min(100, score / next.score * 100)) : 100}%`;
     if (state) shell.dataset.game = JSON.stringify({ status: state.status, score, lives, peak: state.peak, elapsed: state.elapsed, player: state.player, bubbles: state.bubbles.map(b => ({ id: b.id, x: b.x, y: b.y, color: b.color, radius: b.radius })) });
+    renderSound();
   }
-  function clearInput() { keys.clear(); pointerTarget = null; arenaPointer = null; stickPointer = null; joystick = { x: 0, y: 0 }; $('.joystick-ring b').style.transform = 'translate(0,0)'; $('.bubble-joystick').classList.remove('active'); }
+  function clearInput() { keys.clear(); pointerTarget = null; arenaPointer = null; stickPointer = null; stickOrigin = null; joystick = { x: 0, y: 0 }; $('.joystick-ring b').style.transform = 'translate(0,0)'; $('.bubble-joystick').classList.remove('active'); }
   function focusLayer() { const active = $(`[data-layer="${layer}"]`); (active.querySelector('button:not(:disabled)') || active).focus({ preventScroll: true }); }
   function showLayer(name) {
     clearInput(); if (!layer) lastFocus = document.activeElement;
     if (name === 'bag' || name === 'coupon') { fireActive = false; fireworks?.clear(); $('#bubble-fireworks').hidden = true; shell.dataset.celebrating = 'false'; }
     layer = name; layerRoot.hidden = false; dialog.querySelectorAll('[data-layer]').forEach(el => el.hidden = el.dataset.layer !== name);
+    audio.setPlaying(false); renderSound();
     dialog.querySelectorAll('.bubble-chrome').forEach(el => { el.inert = true; }); shell.dataset.paused = 'true';
     $('#bubble-phase').textContent = state?.status === 'over' ? '本局结束' : '暂时休息';
     if (name === 'bag') updateInventoryUI(); focusLayer(); $(`[data-layer="${name}"]`).scrollTop = 0;
@@ -106,6 +105,7 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
     layer = null; returnLayer = null; layerRoot.hidden = true; dialog.querySelectorAll('[data-layer]').forEach(el => el.hidden = true);
     dialog.querySelectorAll('.bubble-chrome').forEach(el => { el.inert = false; }); shell.dataset.paused = 'false'; clearInput(); last = performance.now();
     $('#bubble-phase').textContent = state ? state.status === 'over' ? '本局结束' : '正在冒险' : '等待开始';
+    audio.setPlaying(state?.status === 'playing'); renderSound();
     if (state?.status === 'over') showOver(); else if (state) canvas.focus({ preventScroll: true }); else (lastFocus?.isConnected ? lastFocus : $('[data-action="start"]')).focus({ preventScroll: true });
   }
   function showOver() {
@@ -117,16 +117,16 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
     layer = null; returnLayer = null; layerRoot.hidden = true; dialog.querySelectorAll('[data-layer]').forEach(el => el.hidden = true); dialog.querySelectorAll('.bubble-chrome').forEach(el => { el.inert = false; });
     state = createBubbleGame(width, height, random); particles = []; floaters = []; clearInput();
     shell.dataset.status = 'playing'; shell.dataset.paused = 'false'; $('.bubble-start').hidden = true; $('.bubble-reward-toast').hidden = true;
-    $('[data-action="pause"]').disabled = false; $('#bubble-phase').textContent = '正在冒险'; last = performance.now(); renderHUD(); canvas.focus({ preventScroll: true }); if (sound) audio?.resume().catch(() => {}); tone(440, .15);
+    $('[data-action="pause"]').disabled = false; $('#bubble-phase').textContent = '正在冒险'; last = performance.now(); renderHUD(); canvas.focus({ preventScroll: true }); void audio.startRound().then(renderSound).catch(() => notify('点击右上角声音按钮，开启音乐和音效。'));
   }
   function celebrate() {
     clearTimeout(overTimer); showLayer('celebrate'); $('#bubble-fireworks').hidden = false; fireActive = true; fireTime = 0;
-    fireworks = createFireworks($('#bubble-fireworks'), reduced); shell.dataset.celebrating = 'true'; tone(523, .3);
+    fireworks = createFireworks($('#bubble-fireworks'), reduced); shell.dataset.celebrating = 'true'; audio.cue('unlock');
   }
   function showGift() { returnLayer = null; showLayer('gift'); $('.gift-open').classList.remove('opening'); $('.gift-open').disabled = false; }
   function revealGift() {
     if (!openGift(bag)) return;
-    persist(); updateInventoryUI(); $('.gift-open').disabled = true; $('.gift-open').classList.add('opening'); tone(880, .3);
+    persist(); updateInventoryUI(); $('.gift-open').disabled = true; $('.gift-open').classList.add('opening'); audio.cue('gift');
     clearTimeout(giftTimer); giftTimer = setTimeout(() => { if (open) { returnLayer = null; showLayer('coupon'); notify('榴莲兑换券已放进背包。'); } }, reduced ? 120 : 650);
   }
   function process(events) {
@@ -134,11 +134,13 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
       if (event.type === 'eat' || event.type === 'hurt') {
         burst(event.x, event.y, event.color, event.type === 'eat' ? 16 : 22);
         floaters.push({ x: event.x, y: event.y - 12, text: event.type === 'eat' ? '+1' : '−1 ♥', color: event.type === 'eat' ? '#b6ffe6' : '#ffadc7', age: 0 });
-        if (event.type === 'eat') tone(570 + state.score % 5 * 70, .09); else { tone(165, .17, .045, 'triangle'); $('.bubble-board').classList.remove('hurt'); void $('.bubble-board').offsetWidth; $('.bubble-board').classList.add('hurt'); }
+        audio.cue('pop');
+        if (event.type === 'eat') audio.cue('score'); else { audio.cue('hurt'); $('.bubble-board').classList.remove('hurt'); void $('.bubble-board').offsetWidth; $('.bubble-board').classList.add('hurt'); }
         const earned = unlockRewards(bag, event.score); persist();
         if (earned.length) { updateInventoryUI(); for (const reward of earned) if (reward.id === 'gift') celebrate(); else rewardToast(reward); }
       }
       if (event.type === 'over') {
+        audio.setPlaying(false); audio.cue('death'); renderSound();
         burst(event.x, event.y, event.color, 44, true); shell.dataset.status = 'over'; clearInput(); $('[data-action="pause"]').disabled = true; $('#bubble-phase').textContent = '本局结束';
         clearTimeout(overTimer); overTimer = setTimeout(() => { if (open && !layer) showOver(); }, 900);
       }
@@ -188,6 +190,7 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
     }
   }
   function resize() {
+    if (stickPointer !== null) clearInput();
     width = Math.max(180, arena.clientWidth); height = Math.max(150, arena.clientHeight);
     const dpr = Math.min(devicePixelRatio, 1.8); canvas.width = width * dpr; canvas.height = height * dpr; canvas.style.width = `${width}px`; canvas.style.height = `${height}px`; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (state) resizeBubbleGame(state, width, height); fireworks?.resize(); render(0);
@@ -197,7 +200,7 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
     const item = event.target.closest('[data-item]');
     if (item && !item.disabled) {
       if (item.dataset.item === 'gift') { if (bag.voucher) { returnLayer = 'bag'; showLayer('coupon'); } else showGift(); }
-      else if (useReward(bag, item.dataset.item)) { persist(); updateInventoryUI(); tone(660, .1); }
+      else if (useReward(bag, item.dataset.item)) { persist(); updateInventoryUI(); audio.cue('equip'); }
     }
     const action = event.target.closest('[data-action]')?.dataset.action;
     if (action === 'exit') onExit?.();
@@ -225,19 +228,30 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
   dialog.addEventListener('keyup', event => { keys.delete(keyMap[event.key] || keyMap[event.key.toLowerCase()]); });
   dialog.addEventListener('cancel', event => { event.preventDefault(); if (layer) closeLayer(); else if (state?.status === 'playing') showLayer('pause'); else onExit?.(); });
   function targetAt(event) { const bounds = canvas.getBoundingClientRect(); return { x: (event.clientX - bounds.left) * width / bounds.width, y: (event.clientY - bounds.top) * height / bounds.height }; }
-  canvas.addEventListener('pointerdown', event => { if (layer || state?.status !== 'playing') return; event.preventDefault(); arenaPointer = event.pointerId; canvas.setPointerCapture(event.pointerId); pointerTarget = targetAt(event); });
-  canvas.addEventListener('pointermove', event => { if (event.pointerId === arenaPointer) pointerTarget = targetAt(event); });
-  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(type, event => { if (event.pointerId === arenaPointer) { arenaPointer = null; pointerTarget = null; } });
-  const stick = $('.joystick-ring');
-  function updateStick(event) { const rect = stick.getBoundingClientRect(), dx = event.clientX - rect.left - rect.width / 2, dy = event.clientY - rect.top - rect.height / 2, length = Math.hypot(dx, dy), maximum = rect.width * .32; const factor = length > maximum ? maximum / length : 1; const x = dx * factor, y = dy * factor; joystick = length < 5 ? { x: 0, y: 0 } : { x: x / maximum, y: y / maximum }; $('.joystick-ring b').style.transform = `translate(${x}px,${y}px)`; }
-  stick.addEventListener('pointerdown', event => { if (layer || state?.status !== 'playing') return; event.preventDefault(); stickPointer = event.pointerId; pointerTarget = null; stick.setPointerCapture(event.pointerId); $('.bubble-joystick').classList.add('active'); updateStick(event); });
-  stick.addEventListener('pointermove', event => { if (event.pointerId === stickPointer) updateStick(event); });
-  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) stick.addEventListener(type, event => { if (event.pointerId === stickPointer) { stickPointer = null; joystick = { x: 0, y: 0 }; $('.joystick-ring b').style.transform = 'translate(0,0)'; $('.bubble-joystick').classList.remove('active'); } });
+  function positionStick() {
+    const rect = arena.getBoundingClientRect(); $('.bubble-joystick').style.left = `${stickOrigin.x - rect.left}px`; $('.bubble-joystick').style.top = `${stickOrigin.y - rect.top}px`;
+  }
+  function updateStick(event) {
+    let dx = event.clientX - stickOrigin.x, dy = event.clientY - stickOrigin.y, length = Math.hypot(dx, dy); const maximum = 30;
+    // Follow long swipes, so the control stays close to the thumb.
+    if (length > maximum * 2) { const shift = length - maximum * 1.5; stickOrigin.x += dx / length * shift; stickOrigin.y += dy / length * shift; dx = event.clientX - stickOrigin.x; dy = event.clientY - stickOrigin.y; length = Math.hypot(dx, dy); }
+    const factor = length > maximum ? maximum / length : 1, x = dx * factor, y = dy * factor;
+    joystick = length < 5 ? { x: 0, y: 0 } : { x: x / maximum, y: y / maximum }; positionStick(); $('.joystick-ring b').style.transform = `translate(${x}px,${y}px)`;
+  }
+  canvas.addEventListener('pointerdown', event => {
+    if (layer || state?.status !== 'playing' || arenaPointer !== null) return;
+    event.preventDefault(); arenaPointer = event.pointerId; canvas.setPointerCapture(event.pointerId);
+    if (event.pointerType === 'touch' || event.pointerType === 'pen') {
+      pointerTarget = null; stickPointer = event.pointerId; stickOrigin = { x: event.clientX, y: event.clientY }; joystick = { x: 0, y: 0 }; $('.bubble-joystick').classList.add('active'); updateStick(event);
+    } else pointerTarget = targetAt(event);
+  });
+  canvas.addEventListener('pointermove', event => { if (event.pointerId !== arenaPointer) return; if (event.pointerId === stickPointer) updateStick(event); else pointerTarget = targetAt(event); });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(type, event => { if (event.pointerId === arenaPointer) clearInput(); });
   function suspend() { clearInput(); if (open && !layer && state?.status === 'playing') showLayer('pause'); }
   window.addEventListener('blur', suspend); document.addEventListener('visibilitychange', () => { if (document.hidden) suspend(); });
   updateInventoryUI();
   return {
-    open() { if (open) return; open = true; dialog.showModal(); bag = loadBag(bag); state = null; layer = null; particles = []; floaters = []; clearInput(); layerRoot.hidden = true; dialog.querySelectorAll('[data-layer]').forEach(el => el.hidden = true); dialog.querySelectorAll('.bubble-chrome').forEach(el => el.inert = false); shell.dataset.status = 'ready'; shell.dataset.paused = 'false'; shell.dataset.celebrating = 'false'; $('.bubble-start').hidden = false; $('#bubble-phase').textContent = '等待开始'; $('#bubble-color-name').textContent = '开始后随机选择你的颜色'; $('[data-action="pause"]').disabled = true; $('.bubble-reward-toast').hidden = true; $('#bubble-fireworks').hidden = true; delete shell.dataset.game; updateInventoryUI(); resize(); last = performance.now(); frame = requestAnimationFrame(tick); $('[data-action="start"]').focus({ preventScroll: true }); },
-    close() { open = false; cancelAnimationFrame(frame); clearInput(); clearTimeout(rewardToastTimer); clearTimeout(noticeTimer); clearTimeout(overTimer); clearTimeout(giftTimer); persist(); fireActive = false; fireworks?.clear(); $('#bubble-fireworks').hidden = true; $('.bubble-notice').hidden = true; audio?.suspend(); if (dialog.open) dialog.close(); },
+    open() { if (open) return; open = true; dialog.showModal(); audio.open(); bag = loadBag(bag); state = null; layer = null; particles = []; floaters = []; clearInput(); layerRoot.hidden = true; dialog.querySelectorAll('[data-layer]').forEach(el => el.hidden = true); dialog.querySelectorAll('.bubble-chrome').forEach(el => el.inert = false); shell.dataset.status = 'ready'; shell.dataset.paused = 'false'; shell.dataset.celebrating = 'false'; $('.bubble-start').hidden = false; $('#bubble-phase').textContent = '等待开始'; $('#bubble-color-name').textContent = '开始后随机选择你的颜色'; $('[data-action="pause"]').disabled = true; $('.bubble-reward-toast').hidden = true; $('#bubble-fireworks').hidden = true; delete shell.dataset.game; updateInventoryUI(); resize(); last = performance.now(); frame = requestAnimationFrame(tick); $('[data-action="start"]').focus({ preventScroll: true }); },
+    close() { open = false; cancelAnimationFrame(frame); clearInput(); clearTimeout(rewardToastTimer); clearTimeout(noticeTimer); clearTimeout(overTimer); clearTimeout(giftTimer); persist(); fireActive = false; fireworks?.clear(); $('#bubble-fireworks').hidden = true; $('.bubble-notice').hidden = true; audio.close(); if (dialog.open) dialog.close(); },
   };
 }

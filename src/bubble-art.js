@@ -1,5 +1,7 @@
 import { COLORS } from './bubble-core.js';
 
+export const MYSTERY_SVG = `<svg viewBox="0 0 160 160" aria-hidden="true"><defs><radialGradient id="mystery-glow" cx=".35" cy=".25" r=".8"><stop stop-color="#d9c8fb"/><stop offset="1" stop-color="#817aaa"/></radialGradient></defs><ellipse cx="80" cy="137" rx="36" ry="7" fill="#0c14302a"/><circle cx="80" cy="76" r="48" fill="url(#mystery-glow)" stroke="#dfd7fc" stroke-opacity=".45" stroke-width="2"/><circle cx="80" cy="76" r="40" fill="none" stroke="#efe6ff" stroke-opacity=".2" stroke-dasharray="3 5"/><path d="M68 64c0-17 26-17 26-2 0 10-14 9-14 20" fill="none" stroke="#fff1fa" stroke-width="7" stroke-linecap="round"/><circle cx="80" cy="97" r="4" fill="#fff1fa"/><path d="m125 29 3 8 9 2-7 5 1 8-7-4-7 3 3-8-5-6 8-1Z" fill="#f1d8a9"/><circle cx="24" cy="95" r="3" fill="#b5dcca"/><circle cx="35" cy="28" r="2" fill="#ecd7f8"/></svg>`;
+
 function ellipse(ctx, x, y, rx, ry, fill, stroke) {
   ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
   if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.stroke(); }

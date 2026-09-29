@@ -15,6 +15,12 @@ export const REWARDS = [
   { id: 'gift', score: 50, name: '榴莲兑换券', type: 'voucher', subtitle: '藏在礼盒里的小惊喜' },
 ];
 export const BAG_KEY = 'afterhours.bubble-garden.v1';
+export function rewardPresentation(bag, reward) {
+  const owned = reward.id === 'gift' ? bag.giftEarned : bag.unlocked.includes(reward.id);
+  if (!owned) return { owned: false, name: `奖励${['一', '二', '三', '四', '五'][REWARDS.indexOf(reward)]}`, subtitle: `达到 ${reward.score} 分，揭晓这份惊喜`, art: 'mystery' };
+  if (reward.id === 'gift' && !bag.voucher) return { owned: true, name: '神秘礼盒', subtitle: '点开礼盒，揭晓最后一份惊喜', art: 'gift' };
+  return { owned: true, name: reward.name, subtitle: reward.subtitle, art: reward.id === 'gift' ? 'voucher' : reward.id };
+}
 export function createBag(value = {}) {
   value = value && typeof value === 'object' ? value : {};
   const unlocked = REWARDS.slice(0, 4).filter(r => Array.isArray(value.unlocked) && value.unlocked.includes(r.id)).map(r => r.id);
@@ -48,7 +54,7 @@ export function openGift(bag) { if (!bag.giftEarned) return false; bag.voucher =
 
 export function createBubbleGame(width, height, random = Math.random) {
   const radius = Math.max(15, Math.min(25, Math.min(width, height) * .045));
-  return { width, height, random, status: 'playing', score: 0, lives: 3, peak: 0, elapsed: 0, spawnIn: .65, nextId: 1,
+  return { width, height, random, status: 'playing', score: 0, lives: 3, peak: 0, elapsed: 0, spawnIn: .32, matchIn: .6, nextId: 1,
     protection: 0, bubbles: [], player: { x: width / 2, y: height / 2, radius, color: Math.floor(random() * 7) % 7 }, events: [] };
 }
 export function resizeBubbleGame(state, width, height) {
@@ -58,7 +64,7 @@ export function resizeBubbleGame(state, width, height) {
   state.width = width; state.height = height;
   state.player.x = Math.max(radius, Math.min(width - radius, state.player.x)); state.player.y = Math.max(radius, Math.min(height - radius, state.player.y));
 }
-function spawnBubble(state) {
+function spawnBubble(state, forcedColor) {
   const { random, width, height, player } = state, radius = player.radius * .84;
   let x = 0, y = 0, safe = false;
   for (let i = 0; i < 12; i++) {
@@ -70,8 +76,11 @@ function spawnBubble(state) {
     y = player.y < height / 2 ? height - radius - 12 : radius + 12;
   }
   const angle = random() * Math.PI * 2, speed = 13 + random() * 21;
-  state.bubbles.push({ id: state.nextId++, x, y, radius, color: Math.floor(random() * 7) % 7,
-    vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, age: 0, phase: random() * Math.PI * 2 });
+  // More frequent targets, while all six other colors still appear randomly.
+  const color = forcedColor ?? (random() < .45 ? player.color : (player.color + 1 + Math.floor(random() * 6)) % 7);
+  const bubble = { id: state.nextId++, x, y, radius, color,
+    vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, age: 0, phase: random() * Math.PI * 2 };
+  state.bubbles.push(bubble); return bubble;
 }
 export function stepBubbleGame(state, input = {}, dt = 0) {
   state.events = [];
@@ -89,8 +98,23 @@ export function stepBubbleGame(state, input = {}, dt = 0) {
   player.x = Math.max(player.radius, Math.min(state.width - player.radius, player.x + dx * speed * dt));
   player.y = Math.max(player.radius, Math.min(state.height - player.radius, player.y + dy * speed * dt));
   state.spawnIn -= dt;
+  state.matchIn -= dt;
   const capacity = Math.max(15, Math.min(32, Math.floor(state.width * state.height / 14000)));
-  if (state.spawnIn <= 0) { if (state.bubbles.length < capacity) spawnBubble(state); state.spawnIn = .7 + state.random() * .3; }
+  if (state.spawnIn <= 0) {
+    if (state.bubbles.length < capacity && spawnBubble(state).color === player.color) state.matchIn = 1.4;
+    state.spawnIn = .42 + state.random() * .12;
+  }
+  if (state.matchIn <= 0) {
+    const targets = state.bubbles.filter(b => b.color === player.color).length;
+    if (targets < Math.max(2, Math.floor(capacity * .15))) {
+      if (state.bubbles.length >= capacity) {
+        const oldestOther = state.bubbles.filter(b => b.color !== player.color).reduce((oldest, b) => !oldest || b.age > oldest.age ? b : oldest, null);
+        if (oldestOther) state.bubbles.splice(state.bubbles.indexOf(oldestOther), 1);
+      }
+      if (state.bubbles.length < capacity) spawnBubble(state, player.color);
+    }
+    state.matchIn = 1.4;
+  }
   for (const bubble of state.bubbles) {
     bubble.age += dt;
     bubble.x += (bubble.vx + Math.sin(bubble.age * .7 + bubble.phase) * 4) * dt;
