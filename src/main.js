@@ -28,12 +28,37 @@ let garage = null, activePanel = null, previousFocus = null, ownsHistory = false
 let motion = !matchMedia('(prefers-reduced-motion:reduce)').matches, day = false;
 let motorClub = null, carActive = false, carOwnsHistory = false, carOpening = 0, carPreviousFocus = null;
 let musicStage = null, musicAudio = null, musicActive = false, musicOwnsHistory = false, musicOpening = 0, musicPreviousFocus = null;
+let bubbleGarden = null, gameActive = false, gameOwnsHistory = false, gameOpening = 0, gamePreviousFocus = null;
 const validPanels = new Set([...Object.keys(sections), 'musicworks', 'about', 'contact', 'collection', 'help']);
 
-function updateAmbience() { if (audioGain) audioGain.gain.setTargetAtTime(document.hidden || muted || musicActive ? 0 : .16, audio.currentTime, .2); }
+function updateAmbience() { if (audioGain) audioGain.gain.setTargetAtTime(document.hidden || muted || musicActive || gameActive ? 0 : .16, audio.currentTime, .2); }
+async function openGame({ updateHistory = true } = {}) {
+  if (gameActive) return;
+  closeMusic({ updateHistory: false }); closeCar({ updateHistory: false }); closePanel({ updateHistory: false });
+  gamePreviousFocus = document.activeElement; gameActive = true;
+  const token = ++gameOpening; garage?.setActive(false); document.body.style.overflow = 'hidden'; updateAmbience();
+  if (updateHistory) { history.pushState({ garagePanel: 'game' }, '', '#game'); gameOwnsHistory = true; }
+  toast('正在打开七色泡泡花园…');
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+    if (!bubbleGarden) {
+      const { createBubbleGarden } = await import('./bubble-game.js');
+      if (token !== gameOpening) return;
+      bubbleGarden = createBubbleGarden({ onExit: () => closeGame() });
+    }
+    if (token === gameOpening) { bubbleGarden.open(); $('#toast').hidden = true; }
+  } catch (error) { console.error('Could not enter bubble garden:', error); closeGame(); toast('暂时无法打开泡泡花园，请重新试一次。'); }
+}
+function closeGame({ updateHistory = true } = {}) {
+  if (!gameActive) return;
+  ++gameOpening; gameActive = false; bubbleGarden?.close(); document.body.style.overflow = '';
+  garage?.setActive(!panel.open && !carActive && !musicActive); updateAmbience();
+  if (updateHistory) { if (gameOwnsHistory) history.back(); else history.replaceState(null, '', location.pathname + location.search); }
+  gameOwnsHistory = false; if (gamePreviousFocus?.isConnected) gamePreviousFocus.focus({ preventScroll: true });
+}
 async function openMusic({ updateHistory = true } = {}) {
   if (musicActive) return;
-  closeCar({ updateHistory: false }); closePanel({ updateHistory: false });
+  closeGame({ updateHistory: false }); closeCar({ updateHistory: false }); closePanel({ updateHistory: false });
   musicPreviousFocus = document.activeElement; musicActive = true;
   const token = ++musicOpening;
   garage?.setActive(false); document.body.style.overflow = 'hidden'; updateAmbience();
@@ -53,13 +78,14 @@ async function openMusic({ updateHistory = true } = {}) {
 function closeMusic({ updateHistory = true } = {}) {
   if (!musicActive) return;
   ++musicOpening; musicActive = false; musicAudio?.close(); musicStage?.close();
-  document.body.style.overflow = ''; garage?.setActive(!panel.open && !carActive); updateAmbience();
+  document.body.style.overflow = ''; garage?.setActive(!panel.open && !carActive && !gameActive); updateAmbience();
   if (updateHistory) { if (musicOwnsHistory) history.back(); else history.replaceState(null, '', location.pathname + location.search); }
   musicOwnsHistory = false; if (musicPreviousFocus?.isConnected) musicPreviousFocus.focus({ preventScroll: true });
 }
 
 async function openCar({ updateHistory = true } = {}) {
   if (carActive) return;
+  closeGame({ updateHistory: false });
   closeMusic({ updateHistory: false });
   if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
   closePanel({ updateHistory: false });
@@ -78,7 +104,7 @@ async function openCar({ updateHistory = true } = {}) {
 }
 function closeCar({ updateHistory = true } = {}) {
   if (!carActive) return;
-  ++carOpening; carActive = false; motorClub?.close(); document.body.style.overflow = ''; garage?.setActive(!panel.open);
+  ++carOpening; carActive = false; motorClub?.close(); document.body.style.overflow = ''; garage?.setActive(!panel.open && !musicActive && !gameActive);
   if (updateHistory) { if (carOwnsHistory) history.back(); else history.replaceState(null, '', location.pathname + location.search); }
   carOwnsHistory = false; if (carPreviousFocus?.isConnected) carPreviousFocus.focus({ preventScroll: true });
 }
@@ -113,6 +139,8 @@ async function openPanel(id, { updateHistory = true } = {}) {
   if (!validPanels.has(id) || (activePanel === id && panel.open)) return;
   if (id === 'car') return openCar({ updateHistory });
   if (id === 'music') return openMusic({ updateHistory });
+  if (id === 'game') return openGame({ updateHistory });
+  closeGame({ updateHistory: false });
   closeMusic({ updateHistory: false });
   closeCar({ updateHistory: false });
   if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
@@ -126,7 +154,7 @@ async function openPanel(id, { updateHistory = true } = {}) {
 }
 function closePanel({ updateHistory = true } = {}) {
   if (!panel.open) return;
-  panel.close(); activePanel = null; document.body.style.overflow = ''; garage?.setActive(true);
+  panel.close(); activePanel = null; document.body.style.overflow = ''; garage?.setActive(!gameActive && !carActive && !musicActive);
   document.querySelectorAll('.destinations [data-panel]').forEach(el => el.removeAttribute('aria-current'));
   if (updateHistory) { if (ownsHistory) history.back(); else history.replaceState(null, '', location.pathname + location.search); }
   ownsHistory = false; if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
@@ -136,8 +164,8 @@ $('#close-panel').addEventListener('click', () => closePanel());
 $('#back-garage').addEventListener('click', () => closePanel());
 panel.addEventListener('cancel', e => { e.preventDefault(); closePanel(); });
 panel.addEventListener('click', e => { if (e.target === panel) { const r = panel.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closePanel(); } });
-window.addEventListener('popstate', () => { const id = location.hash.slice(1); if (validPanels.has(id)) openPanel(id, { updateHistory: false }); else { closeMusic({ updateHistory: false }); closeCar({ updateHistory: false }); closePanel({ updateHistory: false }); } });
-$('.brand').addEventListener('click', e => { e.preventDefault(); closeMusic(); closeCar(); closePanel(); garage?.reset(); });
+window.addEventListener('popstate', () => { const id = location.hash.slice(1); if (validPanels.has(id)) openPanel(id, { updateHistory: false }); else { closeGame({ updateHistory: false }); closeMusic({ updateHistory: false }); closeCar({ updateHistory: false }); closePanel({ updateHistory: false }); } });
+$('.brand').addEventListener('click', e => { e.preventDefault(); closeGame(); closeMusic(); closeCar(); closePanel(); garage?.reset(); });
 $('#help-button').addEventListener('click', () => openPanel('help'));
 
 function toast(message) { clearTimeout(toastTimer); $('#toast').textContent = message; $('#toast').hidden = false; toastTimer = setTimeout(() => { $('#toast').hidden = true; }, 2600); }
@@ -178,7 +206,7 @@ $('#scene-host').addEventListener('scene-error', () => sceneError('WebGL context
 try {
   const { createGarage } = await import('./scene.js');
   garage = createGarage({ mount: $('#scene-host'), hotspots: $('#hotspots'), reduced: !motion, onOpen: openPanel,
-    onReady() { $('#scene-loading').classList.add('loaded'); setTimeout(() => { $('#scene-loading').hidden = true; }, 650); document.body.dataset.sceneReady = 'true'; if (panel.open || carActive || musicActive) garage?.setActive(false); },
+    onReady() { $('#scene-loading').classList.add('loaded'); setTimeout(() => { $('#scene-loading').hidden = true; }, 650); document.body.dataset.sceneReady = 'true'; if (panel.open || carActive || musicActive || gameActive) garage?.setActive(false); },
     onHover(id) { const tooltip = $('#scene-tooltip'); tooltip.hidden = !id; if (id) tooltip.textContent = `点击探索 ${sections[id].title} ↗`; },
   });
 } catch (error) { sceneError(error); }
