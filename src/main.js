@@ -25,7 +25,32 @@ function safeUrl(value) { if (!value) return ''; try { const url = new URL(value
 const panel = $('#content-panel');
 let garage = null, activePanel = null, previousFocus = null, ownsHistory = false, toastTimer, muted = true, audio = null, audioGain = null;
 let motion = !matchMedia('(prefers-reduced-motion:reduce)').matches, day = false;
+let motorClub = null, carActive = false, carOwnsHistory = false, carOpening = 0, carPreviousFocus = null;
 const validPanels = new Set([...Object.keys(sections), 'about', 'contact', 'collection', 'help']);
+
+async function openCar({ updateHistory = true } = {}) {
+  if (carActive) return;
+  if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+  closePanel({ updateHistory: false });
+  carPreviousFocus = document.activeElement; carActive = true;
+  const token = ++carOpening; garage?.setActive(false); document.body.style.overflow = 'hidden';
+  if (updateHistory) { history.pushState({ garagePanel: 'car' }, '', '#car'); carOwnsHistory = true; }
+  toast('正在打开复古车库…');
+  try {
+    if (!motorClub) {
+      const { createMotorClub } = await import('./motor.js');
+      if (token !== carOpening) return;
+      motorClub = createMotorClub({ onExit: () => closeCar(), onConfig: value => garage?.setCarConfig(value) });
+    }
+    if (token === carOpening) { motorClub.open(); $('#toast').hidden = true; }
+  } catch (error) { console.error('Could not enter garage:', error); closeCar(); toast('暂时无法进入复古车库，请重新试一次。'); }
+}
+function closeCar({ updateHistory = true } = {}) {
+  if (!carActive) return;
+  ++carOpening; carActive = false; motorClub?.close(); document.body.style.overflow = ''; garage?.setActive(!panel.open);
+  if (updateHistory) { if (carOwnsHistory) history.back(); else history.replaceState(null, '', location.pathname + location.search); }
+  carOwnsHistory = false; if (carPreviousFocus?.isConnected) carPreviousFocus.focus({ preventScroll: true });
+}
 
 function heading(title, english, name = 'spark') { return `<div class="panel-heading"><div><h2 id="panel-title">${escape(title)}</h2><p>${escape(english)}</p></div><span class="panel-icon">${icon(name)}</span></div>`; }
 function worksMarkup(section) {
@@ -55,6 +80,8 @@ function render(id) {
 
 async function openPanel(id, { updateHistory = true } = {}) {
   if (!validPanels.has(id) || (activePanel === id && panel.open)) return;
+  if (id === 'car') return openCar({ updateHistory });
+  closeCar({ updateHistory: false });
   if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
   const wasOpen = panel.open;
   if (!wasOpen) previousFocus = document.activeElement;
@@ -76,8 +103,8 @@ $('#close-panel').addEventListener('click', () => closePanel());
 $('#back-garage').addEventListener('click', () => closePanel());
 panel.addEventListener('cancel', e => { e.preventDefault(); closePanel(); });
 panel.addEventListener('click', e => { if (e.target === panel) { const r = panel.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closePanel(); } });
-window.addEventListener('popstate', () => { const id = location.hash.slice(1); if (validPanels.has(id)) openPanel(id, { updateHistory: false }); else closePanel({ updateHistory: false }); });
-$('.brand').addEventListener('click', e => { e.preventDefault(); closePanel(); garage?.reset(); });
+window.addEventListener('popstate', () => { const id = location.hash.slice(1); if (validPanels.has(id)) openPanel(id, { updateHistory: false }); else { closeCar({ updateHistory: false }); closePanel({ updateHistory: false }); } });
+$('.brand').addEventListener('click', e => { e.preventDefault(); closeCar(); closePanel(); garage?.reset(); });
 $('#help-button').addEventListener('click', () => openPanel('help'));
 
 function toast(message) { clearTimeout(toastTimer); $('#toast').textContent = message; $('#toast').hidden = false; toastTimer = setTimeout(() => { $('#toast').hidden = true; }, 2600); }
@@ -118,7 +145,7 @@ $('#scene-host').addEventListener('scene-error', () => sceneError('WebGL context
 try {
   const { createGarage } = await import('./scene.js');
   garage = createGarage({ mount: $('#scene-host'), hotspots: $('#hotspots'), reduced: !motion, onOpen: openPanel,
-    onReady() { $('#scene-loading').classList.add('loaded'); setTimeout(() => { $('#scene-loading').hidden = true; }, 650); document.body.dataset.sceneReady = 'true'; if (panel.open) garage?.setActive(false); },
+    onReady() { $('#scene-loading').classList.add('loaded'); setTimeout(() => { $('#scene-loading').hidden = true; }, 650); document.body.dataset.sceneReady = 'true'; if (panel.open || carActive) garage?.setActive(false); },
     onHover(id) { const tooltip = $('#scene-tooltip'); tooltip.hidden = !id; if (id) tooltip.textContent = `点击探索 ${sections[id].title} ↗`; },
   });
 } catch (error) { sceneError(error); }

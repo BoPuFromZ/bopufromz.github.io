@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createRetroCar } from './vehicle.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -232,54 +233,10 @@ export function createGarage({ mount, hotspots, onOpen, onReady, onHover, reduce
   const books = [0x84978f, 0x68759e, 0xa19887]; books.forEach((c, i) => box(.55, .075, .45, material(c), 1.07, 1.18 + i * .085, .1, animation));
   floorGlow(palette.animation, 4.5, -4, 4.5, 3); point(palette.animation, 18, [4.4, 2.5, -4.4], 6); route(animation, 'animation');
 
-  // CAR: an original retro hatchback, with round lamps, roof stripes and alloy wheels.
-  const car = new THREE.Group(); car.position.set(-1.45, .25, 1.32); car.rotation.y = -.24; world.add(car);
-  const paint = new THREE.MeshPhysicalMaterial({ color: 0xcd7b44, metalness: .68, roughness: .27, clearcoat: 1, clearcoatRoughness: .18 });
-  const glass = new THREE.MeshPhysicalMaterial({ color: 0x183b3f, metalness: .38, roughness: .13, clearcoat: 1 });
-  const stripe = material(0xe5deba, .4, .2);
-  const bodyShape = new THREE.Shape();
-  bodyShape.moveTo(-1.93, .57); bodyShape.lineTo(-1.86, .97); bodyShape.quadraticCurveTo(-1.7, 1.13, -1.3, 1.12); bodyShape.lineTo(1.62, 1.02); bodyShape.quadraticCurveTo(1.92, .96, 1.98, .74); bodyShape.lineTo(1.94, .46); bodyShape.lineTo(-1.85, .46); bodyShape.closePath();
-  const bodyGeo = new THREE.ExtrudeGeometry(bodyShape, { depth: 1.55, bevelEnabled: true, bevelSegments: 3, steps: 1, bevelSize: .1, bevelThickness: .07, curveSegments: 8 });
-  mesh(bodyGeo, paint, [0, 0, -.775], car);
-  const cabShape = new THREE.Shape(); cabShape.moveTo(-1.17, 1.01); cabShape.lineTo(-.91, 1.88); cabShape.quadraticCurveTo(-.8, 2.01, -.58, 2.01); cabShape.lineTo(.55, 1.98); cabShape.quadraticCurveTo(.73, 1.95, .79, 1.77); cabShape.lineTo(1.04, 1.01); cabShape.closePath();
-  mesh(new THREE.ExtrudeGeometry(cabShape, { depth: 1.39, bevelEnabled: true, bevelSize: .07, bevelThickness: .06, bevelSegments: 3, steps: 1 }), paint, [0, 0, -.695], car);
-  // Side glass follows the cabin silhouette rather than sitting as a rectangular block.
-  for (const z of [-.778, .778]) {
-    const win = new THREE.Shape(); win.moveTo(-1.01, 1.19); win.lineTo(-.79, 1.86); win.lineTo(.55, 1.84); win.lineTo(.84, 1.19); win.closePath();
-    mesh(new THREE.ShapeGeometry(win), new THREE.MeshPhysicalMaterial({ color: 0x163536, roughness: .15, metalness: .55, side: THREE.DoubleSide }), [0, 0, z], car);
-    tube([-.1, 1.2, z * 1.005], [-.16, 1.86, z * 1.005], .025, paint, car);
-    box(.22, .055, .05, shared.steel, .32, 1.07, z * 1.08, car);
-    const mirror = box(.22, .16, .16, paint, .81, 1.35, z * 1.15, car); mirror.rotation.z = -.12;
-    tube([-1.09, .53, z * 1.08], [.99, .53, z * 1.08], .025, shared.steel, car);
-  }
-  const windshield = box(.055, .72, 1.32, glass, .91, 1.52, 0, car); windshield.rotation.z = .33;
-  const rearGlass = box(.055, .66, 1.28, glass, -1.07, 1.54, 0, car); rearGlass.rotation.z = -.3;
-  for (const z of [-.25, .25]) {
-    box(1.27, .017, .15, stripe, -.04, 2.094, z, car);
-    const hoodStripe = box(.82, .022, .15, stripe, 1.42, 1.115, z, car); hoodStripe.rotation.z = -.04;
-  }
-  box(.1, .16, 1.78, shared.steel, 2.07, .57, 0, car); box(.1, .14, 1.76, shared.steel, -2.03, .62, 0, car);
-  box(.09, .25, .68, shared.black, 2.034, .83, 0, car);
-  for (let z = -.29; z <= .3; z += .09) box(.1, .025, .045, shared.steel, 2.09, .84, z, car);
-  const plate = sign('AH · 001', '', 0xd4ee8c, .46, .16, [2.145, .52, 0], car); plate.rotation.y = Math.PI / 2;
-  const headlights = [];
-  for (const z of [-.59, .59]) {
-    const lamp = cylinder(.18, .18, .05, neon(0xffefca, 1.8), 2.02, .9, z, car, 32); lamp.rotation.z = Math.PI / 2; headlights.push(lamp);
-    const rim = mesh(new THREE.TorusGeometry(.19, .032, 10, 32), shared.steel, [2.054, .9, z], car); rim.rotation.y = Math.PI / 2;
-    box(.065, .105, .17, neon(0xff722e, 1), 2.052, .66, z, car);
-    box(.055, .2, .2, neon(0xc84a36, .5), -2.035, .84, z, car);
-  }
-  const tireMat = material(0x111615, .92, .02);
-  for (const x of [-1.27, 1.22]) for (const z of [-.9, .9]) {
-    const wheel = new THREE.Group(); wheel.position.set(x, .48, z); wheel.rotation.x = Math.PI / 2; car.add(wheel);
-    cylinder(.47, .47, .28, tireMat, 0, 0, 0, wheel, 40);
-    const side = z < 0 ? .155 : -.155;
-    cylinder(.33, .33, .028, shared.steel, 0, side, 0, wheel, 32);
-    cylinder(.25, .25, .04, shared.black, 0, side * 1.13, 0, wheel, 32);
-    cylinder(.075, .075, .06, shared.steel, 0, side * 1.32, 0, wheel, 20);
-    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; tube([Math.sin(a) * .07, side * 1.21, Math.cos(a) * .07], [Math.sin(a) * .27, side * 1.21, Math.cos(a) * .27], .03, shared.steel, wheel); }
-    for (let i = 0; i < 20; i++) { const a = i * Math.PI / 10; const tread = box(.03, .29, .025, material(0x222623), Math.sin(a) * .463, 0, Math.cos(a) * .463, wheel); tread.rotation.y = a; }
-  }
+  // Reuse the same retro hatchback in the homepage, custom bay and circuit.
+  const vehicle = createRetroCar(); const car = vehicle.group;
+  car.position.set(-1.45,.25,1.32);car.rotation.y=-.24;world.add(car);
+  const { tireMat, headlights } = vehicle;
   // A lowered work bay with safety markings and warm light beneath the car.
   const bay = box(6.4, .06, 4, material(0x2d3633, .35, .3), -1.5, .26, 1.4);
   for (const z of [-.7, 3.5]) {
@@ -287,7 +244,6 @@ export function createGarage({ mount, hotspots, onOpen, onReady, onHover, reduce
     for (let x = -4.5; x < 1.6; x += .35) { const marking = box(.13, .013, .24, material(0xbdac67), x, .307, z + (z < 0 ? .12 : -.12)); marking.rotation.y = -.45; }
   }
   floorGlow(palette.car, -1.5, 1.4, 6.2, 4.7); point(palette.car, 22, [0, .8, 2.6], 6);
-  const headlightSpot = new THREE.SpotLight(0xffe4af, 22, 9, .4, .7, 1.5); headlightSpot.position.set(2.1, .9, 0); headlightSpot.target.position.set(7, .3, 0); car.add(headlightSpot, headlightSpot.target); headlights.push(headlightSpot);
   route(car, 'car');
 
   // Workshop objects: rolling toolbox, pegboard tools, tires, and an articulated lamp.
@@ -401,9 +357,10 @@ export function createGarage({ mount, hotspots, onOpen, onReady, onHover, reduce
   return {
     reset,
     explore() { const offset = camera.position.clone().sub(controls.target); camera.position.copy(controls.target).add(offset.multiplyScalar(.9)); controls.update(); },
+    setCarConfig(value) { vehicle.setConfig(value); for (let i = pickables.length - 1; i >= 0; i--) if (!pickables[i].parent) pickables.splice(i, 1); car.traverse(o => { if (o.isMesh && !pickables.includes(o)) { o.userData.route = 'car'; pickables.push(o); } }); renderDirty = true; },
     setMotion(value) { motion = value; renderDirty = true; },
     setActive(value) { enabled = value; last = performance.now(); renderDirty = true; },
-    setDay(value) { renderDirty = true; daytime = value; ambient.intensity = value ? 2.25 : 1.3; key.intensity = value ? 4.4 : 3.1; key.color.set(value ? 0xe4eef4 : 0xe7e5c8); scene.environmentIntensity = value ? .8 : .45; renderer.toneMappingExposure = value ? 1.3 : 1.2; lights.forEach(l => { if (!l.userData.nightIntensity) l.userData.nightIntensity = l.intensity; l.intensity = l.userData.nightIntensity * (value ? .4 : 1); }); headlights.forEach(l => { if (l.isLight) l.intensity = value ? 0 : 22; else l.material.emissiveIntensity = value ? .2 : 1.8; }); if (bloom) bloom.strength = value ? .07 : .14; },
+    setDay(value) { renderDirty = true; daytime = value; ambient.intensity = value ? 2.25 : 1.3; key.intensity = value ? 4.4 : 3.1; key.color.set(value ? 0xe4eef4 : 0xe7e5c8); scene.environmentIntensity = value ? .8 : .45; renderer.toneMappingExposure = value ? 1.3 : 1.2; lights.forEach(l => { if (!l.userData.nightIntensity) l.userData.nightIntensity = l.intensity; l.intensity = l.userData.nightIntensity * (value ? .4 : 1); }); headlights.forEach(l => { if (l.isLight) l.intensity = value ? 0 : 22; else l.material.emissiveIntensity = value ? .2 : .95; }); if (bloom) bloom.strength = value ? .07 : .14; },
     dispose() { disposed = true; cancelAnimationFrame(frame); resizeObserver.disconnect(); controls.dispose(); composer?.dispose(); envTarget.dispose(); renderer.dispose(); scene.traverse(o => { o.geometry?.dispose(); const mats = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const m of mats) { m.map?.dispose(); m.dispose(); } }); labels.forEach(l => l.el.remove()); renderer.domElement.remove(); },
   };
 }
