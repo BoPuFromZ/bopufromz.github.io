@@ -2,6 +2,10 @@
 
 Three.js 构建的原创三维车库，包含游戏开发、音乐制作、动画制作、复古改装车和训练区。HTML / CSS 提供内容面板与手机布局。
 
+主页地址：https://bopufromz.github.io/
+
+源码仓库：https://github.com/BoPuFromZ/bopufromz.github.io
+
 ## 本地运行
 
 ```sh
@@ -16,6 +20,8 @@ npm run build
 ```
 
 `dist/` 可以部署到静态网站托管服务。GitHub Pages 的自动发布配置见 `.github/workflows/pages.yml`。
+
+GitHub 仓库的 Settings → Pages → Source 必须选择 **GitHub Actions**，避免直接发布源码目录。之后提交到 `main` 会自动构建并更新主页。
 
 ## 填写内容
 
