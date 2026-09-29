@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { createDj } from './music-dj.js';
 
 export function createMusicWorld({ mount, audio, onError }) {
   const mobile = matchMedia('(max-width:800px)').matches;
@@ -68,27 +69,7 @@ export function createMusicWorld({ mount, audio, onError }) {
     }
     box(.65, .12, .04, metal, x, 2.88, -.22);
   }
-  // The original geometric DJ, assembled locally rather than using an artist avatar.
-  const dj = new THREE.Group(); dj.position.set(-1.25, .5, -2.45); scene.add(dj);
-  const skin = matte('#dfa37e'), clothing = matte('#586176'), hair = matte('#191c27');
-  for (const x of [-.23, .23]) { box(.28, .8, .32, black, x, .45, 0, dj); box(.34, .18, .55, mint, x, .13, .13, dj); }
-  const torso = new THREE.Group(); torso.position.y = .83; dj.add(torso);
-  const body = mesh(new THREE.CylinderGeometry(.42, .34, .95, 12), clothing, 0, .42, 0, torso); body.scale.z = .7;
-  box(.23, .19, .04, glow('#d4ee8c'), 0, .54, .3, torso);
-  const head = new THREE.Group(); head.position.y = 1.24; torso.add(head);
-  mesh(new THREE.SphereGeometry(.34, 24, 16), skin, 0, 0, 0, head);
-  const cap = mesh(new THREE.SphereGeometry(.355, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), hair, 0, .04, 0, head); cap.rotation.z = -.08;
-  box(.5, .045, .35, hair, .05, .14, .3, head);
-  for (const x of [-.35, .35]) box(.13, .32, .25, black, x, .01, 0, head);
-  const band = mesh(new THREE.TorusGeometry(.36, .05, 8, 24, Math.PI), metal, 0, .03, 0, head); band.rotation.z = 0;
-  for (const x of [-.12, .12]) mesh(new THREE.SphereGeometry(.026, 8, 8), black, x, -.02, .315, head);
-  const arms = [];
-  for (const side of [-1, 1]) {
-    const arm = new THREE.Group(); arm.position.set(side * .37, .79, 0); torso.add(arm);
-    rod([0, 0, 0], [side * .2, -.4, .24], .13, clothing, arm);
-    rod([side * .2, -.4, .24], [side * .28, -.42, .73], .09, skin, arm);
-    mesh(new THREE.SphereGeometry(.12, 12, 8), skin, side * .28, -.42, .76, arm); arms.push(arm);
-  }
+  const dj = createDj(); scene.add(dj.group);
   // Turntables and a mixer at the hands, facing the visitor.
   box(3.65, .86, 1.25, dark, -1.25, .96, -1.5);
   box(3.82, .11, 1.38, metal, -1.25, 1.44, -1.5);
@@ -183,15 +164,15 @@ export function createMusicWorld({ mount, audio, onError }) {
   function render(now) {
     if (disposed) return;
     frame = requestAnimationFrame(render);
-    const dt = Math.min((now - last) / 1000 || 0, .05); last = now;
+    const motionDt = Math.min((now - last) / 1000 || 0, .15), dt = Math.min(motionDt, .05); last = now;
     if (!active || document.hidden) return;
     const signal = audio.sample(); level += (signal.bass - level) * .16;
     if (signal.playing && moving) clock += dt;
     controls.update();
-    head.rotation.z = moving ? Math.sin(clock * 5) * level * .13 : 0;
-    torso.rotation.y = moving ? Math.sin(clock * 2) * .06 : 0;
-    for (let i = 0; i < arms.length; i++) arms[i].rotation.y = moving ? Math.sin(clock * (i ? 2.2 : 3) + i) * .17 * (signal.playing ? 1 : 0) : 0;
-    for (const record of records) if (signal.playing && moving) record.rotation.y += dt * 1.8;
+    const gesture = dj.update(signal.groove, motionDt, moving && signal.playing);
+    for (let i = 0; i < records.length; i++) {
+      if (signal.playing && moving) records[i].rotation.y = audio.media.currentTime * 1.8 + (gesture.scratchLeft === (i === 0) ? gesture.scratchOffset : 0);
+    }
     for (let i = 0; i < beams.length; i++) {
       const beam = beams[i], phase = beam.phase;
       target.set(Math.sin(clock * .47 + phase) * 5.7, .03, -1 + Math.cos(clock * .36 + phase) * 3.7);

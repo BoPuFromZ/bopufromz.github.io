@@ -1,9 +1,12 @@
-// One media element and one analyser for the lifetime of the page.
+import { createRhythmTracker } from './music-rhythm.js';
+
+// One media element, a visual analyser and a fast percussion analyser.
 // Created on entry, before importing the larger scene, to retain click activation.
 export function createMusicAudio() {
   const media = new Audio(new URL(`${import.meta.env.BASE_URL}audio/piaoyi.m4a`, document.baseURI).href);
   media.preload = 'metadata'; media.volume = .7;
-  let context, analyser, frequency = new Uint8Array(512), waveform = new Uint8Array(1024);
+  let context, analyser, percussion, frequency = new Uint8Array(512), waveform = new Uint8Array(1024);
+  const fastFrequency = new Uint8Array(512), samples = new Float32Array(1024), rhythm = createRhythmTracker();
   let active = false, requested = false, message = '', seeking = false;
   const listeners = new Set();
   function notify() { for (const listener of listeners) listener(); }
@@ -13,7 +16,8 @@ export function createMusicAudio() {
     if (!AudioContext) return;
     context = new AudioContext(); analyser = context.createAnalyser();
     analyser.fftSize = 1024; analyser.smoothingTimeConstant = .78;
-    context.createMediaElementSource(media).connect(analyser); analyser.connect(context.destination);
+    percussion = context.createAnalyser(); percussion.fftSize = 1024; percussion.smoothingTimeConstant = 0;
+    context.createMediaElementSource(media).connect(percussion); percussion.connect(analyser); analyser.connect(context.destination);
   }
   async function play() {
     if (!active) return;
@@ -41,7 +45,7 @@ export function createMusicAudio() {
     close() { active = false; pause(); void context?.suspend(); },
     toggle() { if (media.paused) void play(); else pause(); },
     pause,
-    seek(value) { if (Number.isFinite(media.duration)) media.currentTime = Math.max(0, Math.min(value, media.duration)); },
+    seek(value) { if (Number.isFinite(media.duration)) { rhythm.reset(); media.currentTime = Math.max(0, Math.min(value, media.duration)); } },
     setVolume(value) { media.volume = Math.max(0, Math.min(1, value)); },
     setSeeking(value) { seeking = value; },
     get seeking() { return seeking; },
@@ -50,13 +54,19 @@ export function createMusicAudio() {
     get loading() { return requested && media.readyState < 3; },
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     sample() {
-      if (analyser && !media.paused && context.state === 'running') {
+      const playing = !!(analyser && !media.paused && !media.ended && !media.seeking && context.state === 'running' && media.readyState >= 3);
+      let rms = 0;
+      if (playing) {
         analyser.getByteFrequencyData(frequency); analyser.getByteTimeDomainData(waveform);
-      } else { frequency.fill(0); waveform.fill(128); }
+        percussion.getByteFrequencyData(fastFrequency); percussion.getFloatTimeDomainData(samples);
+        for (let i = 0; i < samples.length; i++) rms += samples[i] ** 2;
+        rms = Math.sqrt(rms / samples.length);
+      } else { frequency.fill(0); waveform.fill(128); fastFrequency.fill(0); }
       let bass = 0, energy = 0;
       for (let i = 2; i < 32; i++) bass += frequency[i];
       for (let i = 0; i < frequency.length; i++) energy += frequency[i];
-      return { frequency, waveform, bass: bass / (30 * 255), energy: energy / (frequency.length * 255), playing: !media.paused };
+      const groove = rhythm.sample({ frequency: fastFrequency, rms, time: media.currentTime, playing, sampleRate: context?.sampleRate || 44100, fftSize: 1024 });
+      return { frequency, waveform, bass: bass / (30 * 255), energy: energy / (frequency.length * 255), playing, groove };
     },
   };
 }
