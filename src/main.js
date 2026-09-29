@@ -1,4 +1,5 @@
 import { profile, sections } from './content.js';
+import { createMusicAudio } from './music-audio.js';
 
 const $ = selector => document.querySelector(selector);
 const iconPaths = {
@@ -26,10 +27,40 @@ const panel = $('#content-panel');
 let garage = null, activePanel = null, previousFocus = null, ownsHistory = false, toastTimer, muted = true, audio = null, audioGain = null;
 let motion = !matchMedia('(prefers-reduced-motion:reduce)').matches, day = false;
 let motorClub = null, carActive = false, carOwnsHistory = false, carOpening = 0, carPreviousFocus = null;
-const validPanels = new Set([...Object.keys(sections), 'about', 'contact', 'collection', 'help']);
+let musicStage = null, musicAudio = null, musicActive = false, musicOwnsHistory = false, musicOpening = 0, musicPreviousFocus = null;
+const validPanels = new Set([...Object.keys(sections), 'musicworks', 'about', 'contact', 'collection', 'help']);
+
+function updateAmbience() { if (audioGain) audioGain.gain.setTargetAtTime(document.hidden || muted || musicActive ? 0 : .16, audio.currentTime, .2); }
+async function openMusic({ updateHistory = true } = {}) {
+  if (musicActive) return;
+  closeCar({ updateHistory: false }); closePanel({ updateHistory: false });
+  musicPreviousFocus = document.activeElement; musicActive = true;
+  const token = ++musicOpening;
+  garage?.setActive(false); document.body.style.overflow = 'hidden'; updateAmbience();
+  musicAudio ||= createMusicAudio(); musicAudio.open();
+  if (updateHistory) { history.pushState({ garagePanel: 'music' }, '', '#music'); musicOwnsHistory = true; }
+  toast('正在点亮音乐台…');
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+    if (!musicStage) {
+      const { createMusicStage } = await import('./music.js');
+      if (token !== musicOpening) return;
+      musicStage = createMusicStage({ audio: musicAudio, onExit: () => closeMusic(), onWorks: () => openPanel('musicworks') });
+    }
+    if (token === musicOpening) { musicStage.open(); $('#toast').hidden = true; }
+  } catch (error) { console.error('Could not enter music stage:', error); closeMusic(); toast('暂时无法打开音乐台，请重新试一次。'); }
+}
+function closeMusic({ updateHistory = true } = {}) {
+  if (!musicActive) return;
+  ++musicOpening; musicActive = false; musicAudio?.close(); musicStage?.close();
+  document.body.style.overflow = ''; garage?.setActive(!panel.open && !carActive); updateAmbience();
+  if (updateHistory) { if (musicOwnsHistory) history.back(); else history.replaceState(null, '', location.pathname + location.search); }
+  musicOwnsHistory = false; if (musicPreviousFocus?.isConnected) musicPreviousFocus.focus({ preventScroll: true });
+}
 
 async function openCar({ updateHistory = true } = {}) {
   if (carActive) return;
+  closeMusic({ updateHistory: false });
   if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
   closePanel({ updateHistory: false });
   carPreviousFocus = document.activeElement; carActive = true;
@@ -65,11 +96,11 @@ function sectionMarkup(id) {
   return heading(s.title, s.english, id) + `<p class="panel-lead">${escape(s.subtitle)}</p>` + (s.description ? `<p class="panel-description">${escape(s.description)}</p>` : '') + (s.tools.length ? `<div class="tags">${s.tools.map(t => `<span>${escape(t)}</span>`).join('')}</div>` : '') + (s.stats ? `<div class="stats-grid">${s.stats.map(stat => `<div class="stat"><strong>${escape(stat.value)}</strong>${stat.unit ? `<span class="unit">${escape(stat.unit)}</span>` : ''}<p>${escape(stat.label)}</p></div>`).join('')}</div><article class="training-record"><h3>${escape(s.record.title)}</h3><p>${escape(s.record.text)}</p></article>` : '') + worksMarkup(s);
 }
 function render(id) {
-  const section = sections[id];
+  const section = sections[id === 'musicworks' ? 'music' : id];
   panel.style.setProperty('--accent', section?.color || '#d4ee8c');
   $('#panel-kicker').textContent = section ? `${section.number} / ${section.english}` : `AFTERHOURS / ${id.toUpperCase()}`;
   let html;
-  if (section) html = sectionMarkup(id);
+  if (section) html = sectionMarkup(id === 'musicworks' ? 'music' : id);
   else if (id === 'about') html = heading(profile.name || '关于这个车库', 'ONE PERSON. MANY POSSIBILITIES.') + `<div class="about-wordmark">AFTER HOURS<span style="color:#ffb46e">.</span></div><p class="panel-lead">灵感不打烊。<br>这里收藏五种热爱，也留着许多新的可能。</p>${profile.introduction ? `<p class="panel-description">${escape(profile.introduction)}</p>` : '<div class="about-blank" aria-label="个人介绍留白"></div>'}<div class="about-lanes">${Object.values(sections).map(s => `<span>${escape(s.title)}</span>`).join('')}</div>${profile.location ? `<p class="panel-description">${escape(profile.location)}</p>` : ''}`;
   else if (id === 'collection') html = heading('作品索引', 'FIVE DIRECTIONS. KEEP EXPLORING.') + `<p class="panel-lead">选择一个方向，看看正在发生的事。</p><div class="index-grid">${Object.entries(sections).map(([key, s]) => `<button class="index-card" data-panel="${key}" style="--accent:${s.color}"><span class="index-num">${s.number}</span><span class="index-arrow">↗</span><h3>${escape(s.title)}</h3><p>${escape(s.english)}</p></button>`).join('')}</div>`;
   else if (id === 'contact') html = heading('来聊聊', 'GOOD IDEAS START WITH A HELLO.') + `<p class="panel-lead">关于游戏、声音、影像，<br>或者聊聊你正在做的有趣的事。</p>` + [{ label: 'GITHUB', url: profile.github, name: profile.github?.split('/').filter(Boolean).pop() }, ...(profile.email ? [{ label: 'EMAIL', url: `mailto:${profile.email}`, name: profile.email }] : []), ...profile.links].filter(l => safeUrl(l.url)).map(l => `<a class="contact-link" href="${escape(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer"><span><small>${escape(l.label)}</small><strong>${escape(l.name || l.url)}</strong></span><span>↗</span></a>`).join('');
@@ -81,6 +112,8 @@ function render(id) {
 async function openPanel(id, { updateHistory = true } = {}) {
   if (!validPanels.has(id) || (activePanel === id && panel.open)) return;
   if (id === 'car') return openCar({ updateHistory });
+  if (id === 'music') return openMusic({ updateHistory });
+  closeMusic({ updateHistory: false });
   closeCar({ updateHistory: false });
   if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
   const wasOpen = panel.open;
@@ -103,8 +136,8 @@ $('#close-panel').addEventListener('click', () => closePanel());
 $('#back-garage').addEventListener('click', () => closePanel());
 panel.addEventListener('cancel', e => { e.preventDefault(); closePanel(); });
 panel.addEventListener('click', e => { if (e.target === panel) { const r = panel.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) closePanel(); } });
-window.addEventListener('popstate', () => { const id = location.hash.slice(1); if (validPanels.has(id)) openPanel(id, { updateHistory: false }); else { closeCar({ updateHistory: false }); closePanel({ updateHistory: false }); } });
-$('.brand').addEventListener('click', e => { e.preventDefault(); closeCar(); closePanel(); garage?.reset(); });
+window.addEventListener('popstate', () => { const id = location.hash.slice(1); if (validPanels.has(id)) openPanel(id, { updateHistory: false }); else { closeMusic({ updateHistory: false }); closeCar({ updateHistory: false }); closePanel({ updateHistory: false }); } });
+$('.brand').addEventListener('click', e => { e.preventDefault(); closeMusic(); closeCar(); closePanel(); garage?.reset(); });
 $('#help-button').addEventListener('click', () => openPanel('help'));
 
 function toast(message) { clearTimeout(toastTimer); $('#toast').textContent = message; $('#toast').hidden = false; toastTimer = setTimeout(() => { $('#toast').hidden = true; }, 2600); }
@@ -129,12 +162,12 @@ async function toggleSound() {
       const lowpass = audio.createBiquadFilter(); lowpass.type = 'lowpass'; lowpass.frequency.value = 500; noise.connect(lowpass); lowpass.connect(audioGain); noise.start();
       for (const frequency of [55, 82.41]) { const oscillator = audio.createOscillator(); oscillator.type = 'sine'; oscillator.frequency.value = frequency; const g = audio.createGain(); g.gain.value = .05; oscillator.connect(g); g.connect(audioGain); oscillator.start(); }
     }
-    muted = !muted; await audio.resume(); audioGain.gain.setTargetAtTime(muted ? 0 : .16, audio.currentTime, .35);
+    muted = !muted; await audio.resume(); updateAmbience();
     $('#sound-toggle').setAttribute('aria-pressed', String(!muted)); $('#sound-toggle').setAttribute('aria-label', muted ? '开启车库环境声音' : '关闭车库环境声音'); $('#sound-toggle').innerHTML = icon(muted ? 'muted' : 'sound'); toast(muted ? '环境声音已关闭。' : '环境声音已开启 · 轻轻听。');
   } catch { toast('当前浏览器无法播放环境声音。'); }
 }
 $('#sound-toggle').addEventListener('click', toggleSound);
-document.addEventListener('visibilitychange', () => { if (audioGain) audioGain.gain.setTargetAtTime(document.hidden || muted ? 0 : .16, audio.currentTime, .2); });
+document.addEventListener('visibilitychange', updateAmbience);
 
 $('#year').textContent = new Date().getFullYear();
 function tick() { $('#local-time').textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }); }
@@ -145,7 +178,7 @@ $('#scene-host').addEventListener('scene-error', () => sceneError('WebGL context
 try {
   const { createGarage } = await import('./scene.js');
   garage = createGarage({ mount: $('#scene-host'), hotspots: $('#hotspots'), reduced: !motion, onOpen: openPanel,
-    onReady() { $('#scene-loading').classList.add('loaded'); setTimeout(() => { $('#scene-loading').hidden = true; }, 650); document.body.dataset.sceneReady = 'true'; if (panel.open || carActive) garage?.setActive(false); },
+    onReady() { $('#scene-loading').classList.add('loaded'); setTimeout(() => { $('#scene-loading').hidden = true; }, 650); document.body.dataset.sceneReady = 'true'; if (panel.open || carActive || musicActive) garage?.setActive(false); },
     onHover(id) { const tooltip = $('#scene-tooltip'); tooltip.hidden = !id; if (id) tooltip.textContent = `点击探索 ${sections[id].title} ↗`; },
   });
 } catch (error) { sceneError(error); }
