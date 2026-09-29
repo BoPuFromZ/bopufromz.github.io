@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { BAR, BODY, createDeadliftState, beginDeadliftStep, advanceDeadlift, sampleDeadliftPose, solveJoint } from './fitness-motion.js';
+import { BAR, createDeadliftState, beginDeadliftStep, advanceDeadlift, sampleDeadliftPose } from './fitness-motion.js';
+import { createAthlete } from './fitness-athlete.js';
 
 export function createFitnessWorld({ mount, onState, onError }) {
   const mobile = matchMedia('(max-width:800px)').matches;
+  const idleMotion = !matchMedia('(prefers-reduced-motion:reduce)').matches;
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.25 : 1.6));
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
@@ -18,28 +20,19 @@ export function createFitnessWorld({ mount, onState, onError }) {
   controls.minDistance = 4.4; controls.maxDistance = 13;
   controls.minPolarAngle = .35; controls.maxPolarAngle = 1.43;
   controls.minAzimuthAngle = .7; controls.maxAzimuthAngle = Math.PI * 1.42;
-  let disposed = false, dirty = true, view = 0, state = createDeadliftState(), last = performance.now(), lastRender = 0, lastHUD = 0, frame;
+  let disposed = false, dirty = true, view = 0, state = createDeadliftState(), last = performance.now(), lastRender = 0, lastHUD = 0, lastIdle = 0, frame;
   controls.addEventListener('change', () => { dirty = true; });
   const generator = new THREE.PMREMGenerator(renderer), room = new RoomEnvironment();
   const environment = generator.fromScene(room, .04); scene.environment = environment.texture; scene.environmentIntensity = .6;
   room.dispose(); generator.dispose();
   const material = (color, roughness = .65, metalness = .1) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
   const dark = material(0x192422), rubber = material(0x141d1c, .96, .01), steel = material(0x99a6a0, .28, .9);
-  const lime = material(0xb6d580, .55), cloth = material(0x323e3b, .88), skin = material(0xdfbca3, .8, 0), shoesMat = material(0x18201e, .8), soleMat = material(0xc7d1bd);
+  const lime = material(0xb6d580, .55), cloth = material(0x323e3b, .88);
   const glow = color => new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.2, toneMapped: false });
-  const sphereGeometry = new THREE.SphereGeometry(1, 14, 10), boneGeometry = new THREE.CylinderGeometry(1, 1, 1, 12);
-  const up = new THREE.Vector3(0, 1, 0);
   function mesh(geometry, mat, position, parent = scene, shadows = true) {
     const object = new THREE.Mesh(geometry, mat); object.position.set(...position); object.castShadow = shadows; object.receiveShadow = true; parent.add(object); return object;
   }
   const box = (w, h, d, mat, x, y, z, parent = scene) => mesh(new THREE.BoxGeometry(w, h, d), mat, [x, y, z], parent);
-  function sphere(radius, mat, parent) { const object = mesh(sphereGeometry, mat, [0, 0, 0], parent); object.scale.setScalar(radius); return object; }
-  function bone(mat, radius, parent) { const object = mesh(boneGeometry, mat, [0, 0, 0], parent); object.userData.radius = radius; return object; }
-  function connect(object, a, b, radius = object.userData.radius) {
-    const from = new THREE.Vector3(...a), to = new THREE.Vector3(...b), delta = to.clone().sub(from);
-    object.position.copy(from.add(to).multiplyScalar(.5)); object.scale.set(radius, delta.length(), radius);
-    object.quaternion.setFromUnitVectors(up, delta.normalize());
-  }
   function label(text, subtitle, width, height, position, parent = scene, color = '#d4ee8c') {
     const canvas = document.createElement('canvas'); canvas.width = 1024; canvas.height = 256;
     const ctx = canvas.getContext('2d'); ctx.fillStyle = '#172521'; ctx.fillRect(0, 0, 1024, 256);
@@ -101,40 +94,10 @@ export function createFitnessWorld({ mount, onState, onError }) {
     const collar = mesh(new THREE.CylinderGeometry(.065, .065, .07, 20), material(0xb4ac89, .35, .85), [sign * 1.27, 0, 0], bar); collar.rotation.z = Math.PI / 2;
   }
 
-  // A jointed original figure, animated by two-bone arms and legs.
-  const avatar = new THREE.Group(); avatar.name = 'DeadliftFigure'; stage.add(avatar);
-  const torso = mesh(new THREE.CylinderGeometry(.285, .225, 1, 16), lime, [0, 0, 0], avatar);
-  const pelvis = sphere(.235, cloth, avatar); pelvis.scale.set(.25, .14, .18);
-  const neck = bone(skin, .075, avatar);
-  const head = new THREE.Group(); avatar.add(head);
-  const face = sphere(.175, skin, head); face.scale.y *= 1.07;
-  const hair = mesh(new THREE.SphereGeometry(.18, 16, 12, 0, Math.PI * 2, 0, Math.PI * .46), shoesMat, [0, .015, 0], head);
-  for (const x of [-.059, .059]) { const eye = sphere(.018, shoesMat, head); eye.position.set(x, .012, -.165); }
-  const nose = sphere(.027, skin, head); nose.position.set(0, -.012, -.178);
-  const limbs = [-1, 1].map(sign => {
-    const shoulder = sphere(.107, lime, avatar), elbow = sphere(.074, skin, avatar), knee = sphere(.107, cloth, avatar);
-    const upperArm = bone(lime, .088, avatar), forearm = bone(skin, .066, avatar), upperLeg = bone(cloth, .112, avatar), lowerLeg = bone(cloth, .084, avatar);
-    const hand = new THREE.Group(); avatar.add(hand); sphere(.066, skin, hand);
-    const fingers = mesh(new THREE.TorusGeometry(.031, .012, 8, 16), skin, [0, -.012, 0], hand); fingers.rotation.y = Math.PI / 2;
-    const foot = new THREE.Group(); avatar.add(foot); box(.205, .12, .36, shoesMat, 0, 0, -.08, foot); box(.211, .018, .365, soleMat, 0, -.056, -.08, foot);
-    return { sign, shoulder, elbow, knee, upperArm, forearm, upperLeg, lowerLeg, hand, foot };
-  });
+  const athlete = createAthlete(); stage.add(athlete.root);
+  mount.dataset.character = athlete.root.userData.design;
   function applyPose(pose) {
-    avatar.position.set(...pose.root); avatar.rotation.y = pose.yaw; bar.position.y = pose.barY;
-    connect(torso, pose.hips, pose.shoulders, 1); torso.scale.x = 1; torso.scale.z = .70;
-    pelvis.position.set(...pose.hips);
-    const direction = new THREE.Vector3(...pose.shoulders).sub(new THREE.Vector3(...pose.hips)).normalize();
-    const neckStart = new THREE.Vector3(...pose.shoulders).addScaledVector(direction, .015), neckEnd = neckStart.clone().addScaledVector(direction, .11);
-    connect(neck, neckStart.toArray(), neckEnd.toArray());
-    head.position.copy(new THREE.Vector3(...pose.shoulders).addScaledVector(direction, .25)); head.quaternion.setFromUnitVectors(up, direction);
-    limbs.forEach((limb, i) => {
-      const shoulder = pose.shoulderJoints[i], hand = pose.hands[i], hip = pose.hipJoints[i], ankle = pose.ankles[i];
-      const elbow = solveJoint(shoulder, hand, BODY.upperArm, BODY.lowerArm, [limb.sign * .45, 0, 1]);
-      const knee = solveJoint(hip, ankle, BODY.upperLeg, BODY.lowerLeg, [0, 0, -1]);
-      limb.shoulder.position.set(...shoulder); limb.elbow.position.set(...elbow); limb.knee.position.set(...knee);
-      connect(limb.upperArm, shoulder, elbow); connect(limb.forearm, elbow, hand); connect(limb.upperLeg, hip, knee); connect(limb.lowerLeg, knee, ankle);
-      limb.hand.position.set(...hand); limb.foot.position.set(ankle[0], ankle[1] - .075, ankle[2]);
-    });
+    athlete.apply(pose); bar.position.y = pose.barY;
     mount.dataset.pose = JSON.stringify({ root: pose.root, barY: pose.barY, hands: pose.hands, grippingBar: pose.grippingBar, hips: pose.hips, shoulders: pose.shoulders });
     dirty = true;
   }
@@ -145,23 +108,26 @@ export function createFitnessWorld({ mount, onState, onError }) {
   const rim = new THREE.DirectionalLight(0xa4d3c2, 1.2); rim.position.set(-4, 4, 3); scene.add(rim);
   const accent = new THREE.PointLight(0xd4ee8c, 8, 10, 2); accent.position.set(0, 3, 3.5); scene.add(accent);
   function resetCamera() {
-    const presets = [[5.6, 3.5, -7], [.1, 2.8, -8.4], [7.8, 3, -.5]];
-    camera.position.set(...presets[view]).multiplyScalar(mount.clientWidth < 600 ? 1.07 : 1);
-    controls.target.set(-.45, 1.0, .2); controls.update(); dirty = true;
+    const presets = [[4.3, 2.9, -5.8], [.1, 2.4, -7.2], [6.7, 2.6, -.5]];
+    camera.position.set(...presets[view]).multiplyScalar(mount.clientWidth < 600 ? 1.15 : 1);
+    controls.target.set(-.4, 1.07, .12); controls.update(); dirty = true;
   }
   function publish() { onState?.({ ...state }); }
   function reset() { state = createDeadliftState(); applyPose(sampleDeadliftPose()); publish(); }
   const resize = () => { const width = mount.clientWidth || 800, height = mount.clientHeight || 600; camera.aspect = width / height; camera.updateProjectionMatrix(); renderer.setSize(width, height); dirty = true; };
   const observer = new ResizeObserver(resize); observer.observe(mount); resize(); resetCamera(); reset();
+  const visibility = () => { last = performance.now(); };
+  document.addEventListener('visibilitychange', visibility);
   function animate(now) {
     if (disposed) return; frame = requestAnimationFrame(animate);
-    const dt = Math.min((now - last) / 1000, .08); last = now;
+    const dt = Math.max((now - last) / 1000, 0); last = now;
     if (document.hidden) return;
     controls.update();
     if (state.running) {
       const finished = advanceDeadlift(state, dt); applyPose(sampleDeadliftPose(state.step, state.progress));
       if (finished || now - lastHUD > 90) { lastHUD = now; publish(); }
     }
+    if (!state.running && idleMotion && now - lastIdle > 120) { athlete.breathe(now); lastIdle = now; dirty = true; }
     if (dirty && now - lastRender > 33) { renderer.render(scene, camera); dirty = false; lastRender = now; mount.dataset.ready = 'true'; }
   }
   frame = requestAnimationFrame(animate);
@@ -171,10 +137,10 @@ export function createFitnessWorld({ mount, onState, onError }) {
     reset,
     cycleCamera() { view = (view + 1) % 3; resetCamera(); },
     dispose() {
-      disposed = true; cancelAnimationFrame(frame); observer.disconnect(); controls.dispose();
+      disposed = true; cancelAnimationFrame(frame); observer.disconnect(); controls.dispose(); document.removeEventListener('visibilitychange', visibility);
       const geometries = new Set(), materials = new Set(), textures = new Set();
       scene.traverse(object => { if (object.geometry) geometries.add(object.geometry); if (object.isLight) object.dispose?.(); for (const mat of object.material ? (Array.isArray(object.material) ? object.material : [object.material]) : []) { materials.add(mat); for (const value of Object.values(mat)) if (value?.isTexture) textures.add(value); } });
-      geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); textures.forEach(t => t.dispose()); environment.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove(); delete mount.dataset.ready; delete mount.dataset.pose;
+      geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); textures.forEach(t => t.dispose()); environment.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove(); delete mount.dataset.ready; delete mount.dataset.pose; delete mount.dataset.character;
     },
   };
 }

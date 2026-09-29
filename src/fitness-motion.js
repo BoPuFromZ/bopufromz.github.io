@@ -1,14 +1,23 @@
 export const DEADLIFT_STEPS = [
-  { title: '站位', short: '站位', duration: 2.5, detail: '小人走到杠铃前，完成站位。' },
-  { title: '屈髋屈膝抓杠铃', short: '抓杠', duration: 2.2, detail: '小人屈髋屈膝，双手抓住杠铃。' },
-  { title: '预拉', short: '预拉', duration: 1.4, detail: '小人收紧姿态，做出预拉动作。' },
-  { title: '蹬地发力拉起杠铃', short: '拉起', duration: 2.6, detail: '小人蹬地发力，将杠铃拉起并站直。' },
-  { title: '放下', short: '放下', duration: 2.4, detail: '小人屈髋屈膝，把杠铃放回硬拉台。' },
+  { title: '站位', short: '站位', duration: 1.15, detail: '利落迈步，双脚在杠铃前站稳。' },
+  { title: '屈髋屈膝抓杠铃', short: '抓杠', duration: .72, detail: '快速下沉，屈髋屈膝，握紧杠铃。' },
+  { title: '预拉', short: '预拉', duration: .38, detail: '收紧背部，建立张力，准备发力。' },
+  { title: '蹬地发力拉起杠铃', short: '拉起', duration: .82, detail: '蹬地启动，一气呵成拉起，站直锁定。' },
+  { title: '放下', short: '放下', duration: .72, detail: '干净回落，控制杠铃落到硬拉台。' },
 ];
 export const BAR = { floorHeight: .34, z: -.2, grip: .43, shaftWeight: 20, platesPerSide: [20, 20, 20, 20, 10] };
 export const BODY = { torso: .6, upperLeg: .461, lowerLeg: .451, upperArm: .357, lowerArm: .357 };
 const clamp = value => Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
 export const smooth = value => { const t = clamp(value); return t * t * (3 - 2 * t); };
+// Brief tension build-up, a fast drive, then a firm stop without a bar overshoot.
+export function powerProgress(value) {
+  const t = clamp(value), points = [[0, 0, 0], [.10, .025, .55], [.72, .94, .45], [1, 1, 0]];
+  for (let i = 1; i < points.length; i++) if (t <= points[i][0]) {
+    const [ta, a, ma] = points[i - 1], [tb, b, mb] = points[i], length = tb - ta, u = (t - ta) / length;
+    return (2 * u ** 3 - 3 * u ** 2 + 1) * a + (u ** 3 - 2 * u ** 2 + u) * length * ma + (-2 * u ** 3 + 3 * u ** 2) * b + (u ** 3 - u ** 2) * length * mb;
+  }
+  return 1;
+}
 const mix = (a, b, t) => a + (b - a) * t;
 const mixPoint = (a, b, t) => a.map((v, i) => mix(v, b[i], t));
 function bodyPose(hipY, hipZ, pitch) {
@@ -16,7 +25,6 @@ function bodyPose(hipY, hipZ, pitch) {
   return { hips, shoulders: [0, hipY + Math.cos(pitch) * BODY.torso, hipZ - Math.sin(pitch) * BODY.torso], pitch };
 }
 const standing = () => bodyPose(1.048, .015, 0);
-const gripping = () => bodyPose(.72, .42, 1.13);
 const preloading = () => bodyPose(.72, .42, 1.048);
 const pre = preloading();
 const armReach = Math.hypot(.17, pre.shoulders[1] - BAR.floorHeight, pre.shoulders[2] - BAR.z);
@@ -35,7 +43,7 @@ export function beginDeadliftStep(state) {
 }
 export function advanceDeadlift(state, dt) {
   if (!state.running || !Number.isFinite(dt) || dt <= 0) return false;
-  state.elapsed = Math.min(DEADLIFT_STEPS[state.step - 1].duration, state.elapsed + Math.min(dt, .08));
+  state.elapsed = Math.min(DEADLIFT_STEPS[state.step - 1].duration, state.elapsed + dt);
   state.progress = clamp(state.elapsed / DEADLIFT_STEPS[state.step - 1].duration);
   if (state.progress >= 1 - 1e-9) { state.progress = 1; state.completed = state.step; state.running = false; return true; }
   return false;
@@ -44,16 +52,16 @@ export function advanceDeadlift(state, dt) {
 // Joint positions are calculated from the same bar position used by the scene.
 // Feet remain planted from grabbing through the final lowering phase.
 export function sampleDeadliftPose(step = 0, progress = 0) {
-  const p = smooth(progress);
+  const p = step >= 4 ? powerProgress(progress) : smooth(progress);
   let pose = standing(), root = [-2.65, 0, .95], yaw = -1.1, barY = BAR.floorHeight, grippingBar = false;
   const ankles = [[-.23, .14, -.05], [.23, .14, -.05]];
   let hands = [[-.35, 1.025, .08], [.35, 1.025, .08]];
   if (step === 1) {
     root = mixPoint([-2.65, 0, .95], [0, 0, 0], p); yaw = mix(-1.1, 0, smooth((progress - .7) / .3));
-    const fade = Math.sin(Math.PI * clamp(progress)), gait = Math.sin(clamp(progress) * Math.PI * 6);
-    pose = bodyPose(1.048 - .026 * fade + gait * gait * .006 * fade, .015, .055 * fade);
+    const fade = Math.sin(Math.PI * clamp(progress)), gait = Math.sin(clamp(progress) * Math.PI * 4);
+    pose = bodyPose(1.048 - .058 * fade + gait * gait * .008 * fade, .015, .055 * fade);
     for (let i = 0; i < 2; i++) {
-      const stride = gait * (i ? -1 : 1); ankles[i][1] += Math.max(0, stride) * .10 * fade; ankles[i][2] += stride * .14 * fade;
+      const stride = gait * (i ? -1 : 1); ankles[i][1] += Math.max(0, stride) * .12 * fade; ankles[i][2] += stride * .23 * fade;
       hands[i][2] += stride * .18 * fade; hands[i][1] += .025 * fade;
     }
   } else if (step >= 2) {

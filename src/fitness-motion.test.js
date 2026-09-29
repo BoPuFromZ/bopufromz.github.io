@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BAR, BODY, DEADLIFT_STEPS, createDeadliftState, beginDeadliftStep, advanceDeadlift, sampleDeadliftPose, solveJoint } from './fitness-motion.js';
+import { BAR, BODY, DEADLIFT_STEPS, powerProgress, createDeadliftState, beginDeadliftStep, advanceDeadlift, sampleDeadliftPose, solveJoint } from './fitness-motion.js';
 const distance = (a, b) => Math.hypot(...a.map((v, i) => v - b[i]));
 
 test('five deliberate button presses advance exactly one step each', () => {
@@ -27,16 +27,37 @@ test('hands follow the same bar coordinates throughout preload, pull and lowerin
     assert.ok(Math.abs(distance(pose.hips, pose.shoulders) - BODY.torso) < 1e-8);
   }
 });
-test('a continuous pull reaches standing height, and lowering reverses its bar path', () => {
-  let previous = BAR.floorHeight;
+test('a continuous pull locks out firmly and lowering returns without a bar overshoot', () => {
+  let previous = BAR.floorHeight, previousDown = sampleDeadliftPose(5, 0).barY;
   for (let i = 0; i <= 40; i++) {
-    const t = i / 40, up = sampleDeadliftPose(4, t), down = sampleDeadliftPose(5, 1 - t);
+    const t = i / 40, up = sampleDeadliftPose(4, t), down = sampleDeadliftPose(5, t);
     assert.ok(up.barY >= previous - 1e-8); previous = up.barY;
-    assert.ok(Math.abs(up.barY - down.barY) < 1e-8);
+    assert.ok(down.barY <= previousDown + 1e-8); previousDown = down.barY;
+    assert.ok(down.barY >= BAR.floorHeight);
   }
+  assert.deepEqual(sampleDeadliftPose(4, 1), sampleDeadliftPose(5, 0));
   assert.ok(previous > .9);
   assert.equal(sampleDeadliftPose(5, 1).barY, BAR.floorHeight);
   assert.deepEqual(sampleDeadliftPose(1, 1).root, [0, 0, 0]);
+});
+test('actions are brisk, with a fast middle drive and a bounded smooth lockout', () => {
+  assert.ok(DEADLIFT_STEPS.reduce((sum, step) => sum + step.duration, 0) < 4);
+  assert.ok(DEADLIFT_STEPS[3].duration < 1);
+  assert.ok(powerProgress(.72) > .9);
+  let previous = 0;
+  for (let i = 0; i <= 100; i++) {
+    const value = powerProgress(i / 100); assert.ok(value >= previous - 1e-9 && value <= 1); previous = value;
+  }
+  const epsilon = 1e-5;
+  assert.ok((powerProgress(epsilon) - powerProgress(0)) / epsilon < .001);
+  assert.ok((powerProgress(1) - powerProgress(1 - epsilon)) / epsilon < .001);
+});
+test('dropped frames cannot turn a fast action into a slow motion demonstration', () => {
+  const state = createDeadliftState(); state.completed = 3; beginDeadliftStep(state);
+  advanceDeadlift(state, .35); advanceDeadlift(state, .35);
+  assert.ok(Math.abs(state.elapsed - .7) < 1e-9); assert.equal(state.running, true);
+  advanceDeadlift(state, .2);
+  assert.equal(state.completed, 4); assert.equal(state.running, false); assert.equal(state.progress, 1);
 });
 test('all animated arm and leg targets remain reachable with finite joints', () => {
   for (let step = 0; step <= 5; step++) for (let i = 0; i <= 30; i++) {
