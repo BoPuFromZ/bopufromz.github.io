@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#101313" />
+    <meta name="description" content="一个关于游戏、音乐、动画、复古小车与训练的三维创作车库。灵感不打烊。" />
+    <title>AFTERHOURS — 创作车库</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#destinations">跳转至内容导航</a>
+    <div class="ambient-grid" aria-hidden="true"></div>
+    <header class="site-header">
+      <a class="brand" href="#" aria-label="回到创作车库"><span class="brand-symbol" aria-hidden="true">a<span>h</span><i></i></span><span class="brand-name">AFTERHOURS<small>PERSONAL CREATIVE GARAGE</small></span></a>
+      <nav class="header-nav" aria-label="个人导航"><button data-panel="about">关于我</button><button data-panel="collection">作品索引 <span>↗</span></button></nav>
+      <div class="header-actions"><span class="live-status"><i></i> OPEN FOR IDEAS</span><button class="contact-button" data-panel="contact">来聊聊 <span>↗</span></button></div>
+    </header>
+    <main class="main-stage" id="main">
+      <section class="hero" aria-labelledby="hero-title">
+        <p class="eyebrow"><span></span> WELCOME TO MY SIDE OF THE WORLD</p>
+        <h1 id="hero-title">灵感<br>不打<span class="lime">烊<span class="title-dot">.</span></span></h1>
+        <p class="hero-subtitle">MAKE THINGS.<br>MAKE SOME NOISE.</p>
+        <p class="hero-description">把脑海里的世界，变成现实。<br>游戏、声音、影像，还有车库里的热爱。</p>
+        <button class="explore-button" id="explore-button"><span>探索我的车库</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button>
+        <div class="hero-footnote"><span>01—05</span><i></i><span>五种热爱，一个世界</span></div>
+      </section>
+      <section class="scene-area" id="scene-area" aria-label="可探索的三维创作车库">
+        <div class="scene-coordinate" aria-hidden="true"><span>THE GARAGE / VOL. 01</span><span>EST. IN CURIOSITY</span></div>
+        <div id="scene-host" class="scene-host"></div>
+        <div id="hotspots" class="hotspots"></div>
+        <div class="scene-loading" id="scene-loading" role="status"><div class="loading-mark"></div><span>正在点亮车库</span><small>GOOD THINGS TAKE A MOMENT</small></div>
+        <div class="scene-error" id="scene-error" hidden><strong>暂时无法打开三维场景</strong><p>你仍可以通过下方导航探索全部内容。</p><button id="retry-scene">重新加载 ↻</button></div>
+        <div class="scene-caption"><span class="scene-label"><i></i><span id="scene-label">AFTER HOURS, BEFORE TOMORROW.</span></span><span class="scene-instruction">拖动旋转 · 滚轮缩放 · 点击探索</span></div>
+        <div class="scene-tools" aria-label="场景控制"><button id="reset-view" title="恢复视角" aria-label="恢复视角"></button><button id="light-toggle" title="切换灯光" aria-label="切换至日间灯光" aria-pressed="false"></button><button id="motion-toggle" title="动画开关" aria-label="暂停场景动画" aria-pressed="false"></button><button id="sound-toggle" title="车库环境声音" aria-label="开启车库环境声音" aria-pressed="false"></button><button id="fullscreen-toggle" title="全屏探索" aria-label="全屏探索"></button></div>
+        <div id="scene-tooltip" class="scene-tooltip" hidden></div>
+      </section>
+    </main>
+    <nav class="destinations" id="destinations" aria-label="探索五个兴趣区域">
+      <button data-panel="game" style="--accent:#8bebde"><span class="destination-number">01</span><span class="destination-icon" data-icon="game"></span><span class="destination-copy"><strong>游戏开发</strong><small>BUILD A WORLD</small></span><span class="destination-arrow">↗</span></button>
+      <button data-panel="music" style="--accent:#da98d7"><span class="destination-number">02</span><span class="destination-icon" data-icon="music"></span><span class="destination-copy"><strong>音乐制作</strong><small>FIND THE FREQUENCY</small></span><span class="destination-arrow">↗</span></button>
+      <button data-panel="animation" style="--accent:#b0a1ff"><span class="destination-number">03</span><span class="destination-icon" data-icon="animation"></span><span class="destination-copy"><strong>动画制作</strong><small>FRAME BY FRAME</small></span><span class="destination-arrow">↗</span></button>
+      <button data-panel="car" style="--accent:#ffb46e"><span class="destination-number">04</span><span class="destination-icon" data-icon="car"></span><span class="destination-copy"><strong>改装车</strong><small>BUILT, NOT BOUGHT</small></span><span class="destination-arrow">↗</span></button>
+      <button data-panel="fitness" style="--accent:#d4ee8c"><span class="destination-number">05</span><span class="destination-icon" data-icon="fitness"></span><span class="destination-copy"><strong>健身</strong><small>ONE MORE REP</small></span><span class="destination-arrow">↗</span></button>
+    </nav>
+    <footer class="site-footer"><span>© <span id="year"></span> AFTERHOURS <span class="footer-divider">/</span> 保持好奇，持续创造。</span><button id="help-button">探索指南 <span>?</span></button><span class="footer-clock"><i></i><time id="local-time"></time> LOCAL TIME</span></footer>
+    <dialog id="content-panel" aria-labelledby="panel-title"><div class="panel-shell"><header class="panel-header"><span id="panel-kicker"></span><button id="close-panel" aria-label="关闭内容面板">✕</button></header><div class="panel-body" id="panel-body"></div><footer class="panel-footer"><span>AFTERHOURS / CREATIVE GARAGE</span><button id="back-garage">回到车库 <span>↗</span></button></footer></div></dialog>
+    <div class="toast" id="toast" role="status" hidden></div>
+    <noscript><div class="noscript-message">开启 JavaScript，即可探索三维创作车库。游戏开发、音乐制作、动画制作、改装车与健身。GitHub：<a href="https://github.com/BoPuFromZ">BoPuFromZ</a>。</div></noscript>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
