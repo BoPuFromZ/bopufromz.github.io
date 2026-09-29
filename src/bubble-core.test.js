@@ -110,13 +110,37 @@ test('blocked browser storage still preserves the personal collection when retur
   session.open(); unlockRewards(session.bag, 10); assert.equal(session.save(), 'memory');
   session.enterGuest(); unlockRewards(session.bag, 40); session.leaveGuest(); assert.deepEqual(session.bag.unlocked, ['frog']);
 });
-test('joystick has a radial dead zone, fine movement, stable directions and bounded diagonal speed', () => {
-  assert.deepEqual(joystickVector(2, 2), { x: 0, y: 0 });
-  const fine = joystickVector(10, 0), fast = joystickVector(32, 0), diagonal = joystickVector(100, 100);
-  assert.ok(fine.x > 0 && fine.x < .2); assert.equal(fine.y, 0); assert.equal(fast.x, 1);
+test('fast joystick responds at full speed after a tiny push; fine mode has a short responsive stroke', () => {
+  assert.deepEqual(joystickVector(1, 1), { x: 0, y: 0 });
+  const fine = joystickVector(10, 0, 18, 'fine'), fast = joystickVector(3, 0), diagonal = joystickVector(100, 100);
+  assert.ok(fine.x > .5 && fine.x < .7); assert.equal(fine.y, 0); assert.equal(fast.x, 1);
   assert.ok(Math.abs(Math.hypot(diagonal.x, diagonal.y) - 1) < 1e-9); assert.equal(diagonal.x, diagonal.y);
-  assert.ok(joystickVector(16, 0, 32, .65).x < joystickVector(16, 0, 32, 1.35).x);
+  assert.equal(joystickVector(18, 0, 18, 'fine').x, 1);
+  assert.equal(joystickVector(0, -3).y, -1);
   assert.deepEqual(joystickVector(NaN, 2), { x: 0, y: 0 });
+});
+test('touch speed settings affect movement without increasing diagonal speed or teleporting', () => {
+  const normal = quietGame(), quick = quietGame(), diagonal = quietGame();
+  stepBubbleGame(normal, { x: 1 }, .05); stepBubbleGame(quick, { x: 1, speedScale: 1.6 }, .05); stepBubbleGame(diagonal, { x: 1, y: 1, speedScale: 1.6 }, .05);
+  assert.ok(Math.abs((quick.player.x - 400) / (normal.player.x - 400) - 1.6) < 1e-8);
+  assert.ok(Math.abs(Math.hypot(diagonal.player.x - 400, diagonal.player.y - 250) - (quick.player.x - 400)) < 1e-8);
+  assert.ok(quick.player.x - 400 <= 22);
+});
+test('reward three unlocks sky and ocean together; reward four unlocks mermaid and fairy together', () => {
+  const bag = createBag();
+  assert.equal(useReward(bag, 'ocean'), false); assert.equal(useReward(bag, 'fairy'), false);
+  unlockRewards(bag, 30); assert.equal(useReward(bag, 'ocean'), true); assert.equal(bag.background, 'ocean'); assert.equal(useReward(bag, 'fairy'), false);
+  useReward(bag, 'sky'); useReward(bag, 'sky'); assert.equal(bag.background, 'sky');
+  unlockRewards(bag, 40); useReward(bag, 'fairy'); assert.equal(bag.skin, 'fairy'); assert.equal(bag.background, 'sky');
+  useReward(bag, 'ocean'); useReward(bag, 'mermaid'); assert.equal(bag.background, 'ocean'); assert.equal(bag.skin, 'mermaid');
+  assert.deepEqual(bag.unlocked, ['frog', 'pig', 'sky', 'mermaid']);
+  useReward(bag, 'night'); assert.equal(bag.background, 'night'); assert.equal(bag.skin, 'mermaid');
+});
+test('existing unlocked bags gain new choices without losing scores, rewards or the voucher', () => {
+  const old = createBag({ unlocked: ['frog', 'pig', 'sky', 'mermaid'], skin: 'mermaid', background: 'sky', voucher: true, bestScore: 50 });
+  assert.equal(useReward(old, 'fairy'), true); assert.equal(useReward(old, 'ocean'), true);
+  const restored = createBag(JSON.parse(JSON.stringify(old))); assert.equal(restored.skin, 'fairy'); assert.equal(restored.background, 'ocean'); assert.equal(restored.voucher, true); assert.equal(restored.bestScore, 50);
+  const locked = createBag({ skin: 'fairy', background: 'ocean', unlocked: ['fairy', 'ocean'] }); assert.equal(locked.skin, 'bubble'); assert.equal(locked.background, 'night');
 });
 function pickup(state, type, overrides = {}) {
   const item = { id: state.nextId++, type, x: state.player.x, y: state.player.y, radius: 20, vx: 0, vy: 0, age: 1, ttl: 18, ...overrides }; state.pickups.push(item); return item;

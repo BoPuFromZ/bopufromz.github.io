@@ -49,6 +49,29 @@ export function drawCharacter(ctx, skin, color, x, y, radius, time = 0, { player
     ctx.strokeStyle = tone.dark; ctx.beginPath(); ctx.arc(0, .42, .13, .2, Math.PI - .2); ctx.stroke();
     ellipse(ctx, -.28, -.42, .15, .07, '#ffffff60');
     for (const side of [-1, 1]) ellipse(ctx, side * .42, .75, .18, .12, tone.dark);
+  } else if (skin === 'fairy') {
+    // Small translucent leaf wings sit behind the dress, with a gentle flutter.
+    for (const side of [-1, 1]) {
+      const flutter = .95 + Math.sin(time * 7 + color) * .045;
+      ctx.save(); ctx.translate(side * .42, .04); ctx.rotate(side * -.35); ctx.scale(flutter, 1);
+      const wing = ctx.createLinearGradient(0, -.5, side, .5); wing.addColorStop(0, '#effff3da'); wing.addColorStop(1, tone.hex + '70');
+      ellipse(ctx, side * .41, -.12, .52, .26, wing, '#d3f9e4b0'); ellipse(ctx, side * .31, .29, .37, .20, wing, '#d3f9e4b0');
+      ctx.strokeStyle = '#fffdeca0'; ctx.lineWidth = .025; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(side * .79, -.16); ctx.moveTo(0, 0); ctx.lineTo(side * .58, .36); ctx.stroke(); ctx.restore();
+    }
+    for (const side of [-1, 1]) { ellipse(ctx, side * .15, .86, .065, .21, '#ffe4ce'); ellipse(ctx, side * .19, 1.02, .14, .065, tone.dark); }
+    ctx.fillStyle = tone.hex; ctx.strokeStyle = tone.dark; ctx.lineWidth = .035; ctx.beginPath(); ctx.moveTo(-.22, .12); ctx.lineTo(.22, .12);
+    ctx.bezierCurveTo(.26, .39, .39, .47, .47, .68); ctx.quadraticCurveTo(.20, .81, 0, .69); ctx.quadraticCurveTo(-.22, .85, -.47, .68); ctx.quadraticCurveTo(-.23, .40, -.22, .12); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#fff2d795'; ctx.lineWidth = .025;
+    for (const side of [-1, 1]) { ctx.beginPath(); ctx.moveTo(0, .22); ctx.quadraticCurveTo(side * .13, .52, side * .33, .68); ctx.stroke(); }
+    ellipse(ctx, 0, -.39, .62, .62, tone.hex, tone.dark); ellipse(ctx, 0, -.29, .46, .46, '#ffe8d6');
+    ctx.fillStyle = tone.hex; ctx.beginPath(); ctx.moveTo(-.46, -.43); ctx.quadraticCurveTo(-.39, -.92, .10, -.84); ctx.quadraticCurveTo(.49, -.82, .47, -.28); ctx.quadraticCurveTo(.27, -.30, .10, -.67); ctx.quadraticCurveTo(-.08, -.37, -.46, -.43); ctx.fill();
+    face(ctx, -.27, .18);
+    for (const side of [-1, 1]) ellipse(ctx, side * .31, .25, .08, .18, '#ffe4ce');
+    ctx.strokeStyle = '#6aaf7c'; ctx.lineWidth = .045; ctx.beginPath(); ctx.arc(0, -.43, .52, Math.PI * 1.17, Math.PI * 1.8); ctx.stroke();
+    for (const side of [-1, 1]) { ctx.save(); ctx.translate(side * .31, -.85); ctx.rotate(side * .7); ellipse(ctx, 0, 0, .15, .065, '#a1dd91', '#547d55'); ctx.restore(); }
+    for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5; ellipse(ctx, .03 + Math.cos(a) * .085, -.95 + Math.sin(a) * .085, .06, .06, '#fff5d8'); }
+    ellipse(ctx, .03, -.95, .04, .04, '#efbf66');
+    ctx.strokeStyle = '#e4c68e'; ctx.lineWidth = .035; ctx.beginPath(); ctx.moveTo(.35, .32); ctx.lineTo(.66, -.10); ctx.stroke(); star(ctx, .68, -.12, .13, '#fff0ac');
   } else if (skin === 'mermaid') {
     ctx.fillStyle = tone.hex; ctx.strokeStyle = tone.dark; ctx.beginPath(); ctx.moveTo(-.27, .1); ctx.quadraticCurveTo(-.44, .67, .1, .82); ctx.quadraticCurveTo(.45, .9, .39, .51); ctx.quadraticCurveTo(.27, .69, .2, .59); ctx.lineTo(.2, .14); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.fillStyle = tone.hex; ctx.beginPath(); ctx.moveTo(.11, .78); ctx.quadraticCurveTo(-.37, .91, -.37, 1.13); ctx.quadraticCurveTo(.06, 1.09, .2, .87); ctx.quadraticCurveTo(.47, 1.11, .68, 1.05); ctx.quadraticCurveTo(.56, .72, .11, .78); ctx.fill(); ctx.stroke();
@@ -114,12 +137,43 @@ function cloud(ctx, x, y, size, alpha) {
 export function drawBackground(ctx, width, height, background, time = 0) {
   const gradient = ctx.createLinearGradient(0, 0, width * .3, height);
   if (background === 'sky') { gradient.addColorStop(0, '#a9dbff'); gradient.addColorStop(.5, '#c8eaff'); gradient.addColorStop(1, '#edf6ff'); }
+  else if (background === 'ocean') { gradient.addColorStop(0, '#1689a3'); gradient.addColorStop(.4, '#095b79'); gradient.addColorStop(1, '#162f50'); }
   else { gradient.addColorStop(0, '#162341'); gradient.addColorStop(.55, '#1a2440'); gradient.addColorStop(1, '#242944'); }
   ctx.fillStyle = gradient; ctx.fillRect(0, 0, width, height);
   if (background === 'sky') {
     const sun = ctx.createRadialGradient(width * .84, height * .16, 0, width * .84, height * .16, height * .26); sun.addColorStop(0, '#fff8c9b0'); sun.addColorStop(1, '#fff8c900'); ctx.fillStyle = sun; ctx.fillRect(0, 0, width, height);
     ellipse(ctx, width * .84, height * .16, 24, 24, '#fff6c7');
     for (let i = 0; i < 6; i++) cloud(ctx, ((i * width * .29 + time * (i % 2 ? 1.8 : -1.2) + width * 2) % (width + 180)) - 60, height * (.15 + i * .13), 35 + i % 3 * 20, .38 + i % 2 * .22);
+  } else if (background === 'ocean') {
+    for (let i = 0; i < 5; i++) {
+      const x = width * (.08 + i * .25) + Math.sin(time * .14 + i) * 10;
+      const light = ctx.createLinearGradient(x, 0, x + width * .15, height * .88); light.addColorStop(0, '#b2fff128'); light.addColorStop(1, '#9febff00');
+      ctx.fillStyle = light; ctx.beginPath(); ctx.moveTo(x - width * .025, 0); ctx.lineTo(x + width * .025, 0); ctx.lineTo(x + width * .21, height * .88); ctx.lineTo(x + width * .07, height * .88); ctx.fill();
+    }
+    ctx.strokeStyle = '#b3ecea35'; ctx.lineWidth = 2;
+    for (let row = 0; row < 3; row++) {
+      ctx.beginPath(); for (let x = 0; x <= width + 10; x += 12) { const y = 10 + row * 9 + Math.sin(x / 35 + time * .35 + row) * 3; if (x) ctx.lineTo(x, y); else ctx.moveTo(x, y); } ctx.stroke();
+    }
+    for (let i = 0; i < 10; i++) {
+      const x = (i * 97.3 + width * .1) % width, y = height - ((i * 61.7 + time * (4 + i % 3)) % height);
+      ellipse(ctx, x, y, 2 + i % 3, 2 + i % 3, null, '#b4eff229');
+    }
+    const sand = ctx.createLinearGradient(0, height * .9, 0, height); sand.addColorStop(0, '#8da995'); sand.addColorStop(1, '#b5c1a0');
+    ctx.fillStyle = sand; ctx.beginPath(); ctx.moveTo(0, height * .94); ctx.quadraticCurveTo(width * .23, height * .88, width * .5, height * .96); ctx.quadraticCurveTo(width * .78, height * .89, width, height * .94); ctx.lineTo(width, height); ctx.lineTo(0, height); ctx.fill();
+    for (const side of [0, 1]) {
+      ctx.save(); ctx.translate(side ? width - 18 : 18, height * .96); ctx.scale(side ? -1 : 1, 1);
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 5; i++) {
+        ctx.strokeStyle = i % 2 ? '#73bdb29c' : '#4aa897a8'; ctx.lineWidth = 6 + i % 2 * 3;
+        ctx.beginPath(); ctx.moveTo(4 + i * 8, 0); ctx.bezierCurveTo(-12 + i * 8, -20, 30 + i * 5, -45, 12 + i * 7 + Math.sin(time * .6 + i) * 4, -38 - i * 8); ctx.stroke();
+      }
+      ctx.strokeStyle = '#eca298b5'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(57, 0); ctx.lineTo(57, -33); ctx.moveTo(57, -14); ctx.lineTo(43, -24); ctx.lineTo(43, -33); ctx.moveTo(57, -24); ctx.lineTo(70, -36); ctx.lineTo(70, -43); ctx.stroke();
+      star(ctx, 91, -5, 10, '#eeb797'); ctx.restore();
+    }
+    for (let i = 0; i < 4; i++) {
+      const x = ((i * width * .29 + time * 2 + width) % (width + 80)) - 40, y = height * (.22 + i * .15);
+      ellipse(ctx, x, y, 8, 3.5, '#81cbd41d'); ctx.fillStyle = '#81cbd41d'; ctx.beginPath(); ctx.moveTo(x - 6, y); ctx.lineTo(x - 13, y - 4); ctx.lineTo(x - 13, y + 4); ctx.fill();
+    }
   } else {
     ctx.fillStyle = '#b4c7ff30';
     for (let i = 0; i < 65; i++) { const x = (i * 113.7) % width, y = (i * 79.19) % height; ellipse(ctx, x, y, i % 8 ? .7 : 1.2, i % 8 ? .7 : 1.2, '#b4c7ff30'); }
@@ -134,9 +188,9 @@ export function avatarImage(skin, color = 3) {
   const canvas = document.createElement('canvas'); canvas.width = 180; canvas.height = 160;
   drawCharacter(canvas.getContext('2d'), skin, color, 90, 77, 55, 0); return canvas.toDataURL();
 }
-export function skyImage() {
+export function skyImage(background = 'sky') {
   const canvas = document.createElement('canvas'); canvas.width = 210; canvas.height = 140;
-  drawBackground(canvas.getContext('2d'), 210, 140, 'sky'); return canvas.toDataURL();
+  drawBackground(canvas.getContext('2d'), 210, 140, background); return canvas.toDataURL();
 }
 export const GIFT_SVG = `<svg viewBox="0 0 240 240" aria-hidden="true"><defs><linearGradient id="gift-box" x2="1" y2="1"><stop stop-color="#ffb6cc"/><stop offset="1" stop-color="#ca7fcf"/></linearGradient><linearGradient id="gift-ribbon" x2="0" y2="1"><stop stop-color="#fff5b4"/><stop offset="1" stop-color="#ffd886"/></linearGradient></defs><ellipse cx="120" cy="215" rx="67" ry="10" fill="#0b102740"/><g class="gift-base"><path d="m45 104 75 17 75-17v89l-75 25-75-25Z" fill="url(#gift-box)" stroke="#fff" stroke-opacity=".35" stroke-width="2"/><path d="m120 121 75-17v89l-75 25Z" fill="#9269bd" opacity=".35"/><path d="m104 118 16 3 17-4v96l-17 5-16-5Z" fill="url(#gift-ribbon)"/><path d="m45 154 75 20 75-20v17l-75 23-75-23Z" fill="#ffe5a1" opacity=".7"/></g><g class="gift-lid"><path d="m37 96 83-26 83 26-83 27Z" fill="#ffd0e0"/><path d="m37 96 83 27 83-27v20l-83 26-83-26Z" fill="url(#gift-box)"/><path d="m106 74 14-4 14 4v63l-14 5-14-5Z" fill="url(#gift-ribbon)"/><path d="m70 85 14-5 83 26-15 5Z" fill="#ffedb0"/><path d="M119 71C77 73 62 43 77 31c19-16 43 19 42 40Z" fill="none" stroke="#ffeeb7" stroke-width="14"/><path d="M121 71c43 2 58-28 43-40-19-16-43 19-43 40Z" fill="none" stroke="#ffeeb7" stroke-width="14"/><circle cx="120" cy="69" r="12" fill="#fff5ce"/></g><path d="m31 63 4 10 11 2-9 7 1 11-9-6-10 4 4-10-7-8 11 1Z" fill="#ffeaaa"/><path d="m205 155 4 10 10 2-8 7 1 10-9-5-9 4 3-10-7-7 10-1Z" fill="#b9e9ec"/></svg>`;
 export const DURIAN_SVG = `<svg viewBox="0 0 160 160" aria-hidden="true"><ellipse cx="80" cy="138" rx="43" ry="7" fill="#817b341c"/><path d="M77 32c-2-14 1-19 8-24" fill="none" stroke="#687140" stroke-width="8" stroke-linecap="round"/><path d="m78 25 9 7 13-2 6 11 12 2 3 13 11 8-3 13 7 12-7 12 1 12-12 6-7 12-14-1-11 7-12-6-14 2-8-11-12-4-1-13-8-10 5-13-4-13 9-9 2-13 13-4 6-12 14 2Z" fill="#b7c56c" stroke="#758345" stroke-width="3" stroke-linejoin="round"/><path d="M81 37c-24 12-30 70-6 93" fill="none" stroke="#dce79a" stroke-width="6"/><path d="m49 55 6 8-11 3Zm52-6 5 10-12-3Zm16 34-9 7 1-12Zm-70 28 5-10 6 10Zm58 7-10-4 10-7Z" fill="#81914a"/><ellipse cx="66" cy="79" rx="4" ry="6" fill="#404d30"/><ellipse cx="97" cy="79" rx="4" ry="6" fill="#404d30"/><path d="M73 94q9 10 18 0" fill="none" stroke="#404d30" stroke-width="3" stroke-linecap="round"/><ellipse cx="56" cy="91" rx="7" ry="4" fill="#eaae8880"/><ellipse cx="106" cy="91" rx="7" ry="4" fill="#eaae8880"/></svg>`;

@@ -1,12 +1,12 @@
 import './bubble-game.css';
-import { COLORS, REWARDS, rewardPresentation, createBubbleGame, resizeBubbleGame, stepBubbleGame, createBackpackSession, joystickVector, MAX_LIVES, FEAST_SECONDS, unlockRewards, useReward, openGift } from './bubble-core.js';
+import { COLORS, REWARDS, REWARD_VARIANTS, rewardPresentation, createBubbleGame, resizeBubbleGame, stepBubbleGame, createBackpackSession, joystickVector, MAX_LIVES, FEAST_SECONDS, unlockRewards, useReward, openGift } from './bubble-core.js';
 import { drawCharacter, drawPickup, drawBackground, avatarImage, skyImage, star, GIFT_SVG, DURIAN_SVG, MYSTERY_SVG } from './bubble-art.js';
 import { createFireworks } from './bubble-fx.js';
 import { createBubbleAudio } from './bubble-audio.js';
 
 export function createBubbleGarden({ onExit, random = Math.random }) {
   const dialog = document.createElement('dialog'); dialog.id = 'bubble-garden'; dialog.setAttribute('aria-label', '游戏开发：七色泡泡花园');
-  const art = { bubble: avatarImage('bubble', 4), frog: avatarImage('frog', 3), pig: avatarImage('pig', 0), mermaid: avatarImage('mermaid', 6), sky: skyImage() };
+  const art = { bubble: avatarImage('bubble', 4), frog: avatarImage('frog', 3), pig: avatarImage('pig', 0), mermaid: avatarImage('mermaid', 6), fairy: avatarImage('fairy', 3), sky: skyImage(), ocean: skyImage('ocean') };
   const heart = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21C-5 10 3-4 12 6c9-10 17 4 0 15Z"/></svg>';
   const backpackIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5V3h8v2M5 7q7-5 14 0v14H5ZM5 11H3v8h2m14-8h2v8h-2M8 14h8v5H8ZM9 9h6"/></svg>';
   dialog.innerHTML = `<div class="bubble-shell" data-status="ready">
@@ -14,9 +14,9 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
     <div class="bubble-layout bubble-chrome"><section class="bubble-board" aria-label="泡泡游戏场地"><div class="bubble-board-top"><span><i></i><b id="bubble-phase">等待开始</b></span><span id="bubble-color-name">开始后随机选择你的颜色</span><button data-action="pause" aria-label="暂停游戏" disabled>Ⅱ</button></div>
       <div class="bubble-arena"><canvas id="bubble-canvas" tabindex="0" aria-label="七色泡泡游戏。方向键或 WASD 移动，手机拖动或使用摇杆。同色加分，异色减分并损失生命。"></canvas>
         <div class="bubble-start"><div class="start-sticker"><img src="${art.bubble}" alt="微笑的天空蓝泡泡"/><span>LET'S PLAY!</span><i>✦</i></div><p class="bubble-eyebrow">SEVEN COLORS. ONE LITTLE ADVENTURE.</p><h1>同色相遇，<br>快乐<span>加分。</span></h1><p>吃掉同色泡泡，收集分数里的惊喜。<br>红心补血，彩虹星全色可吃，小心黑色炸弹。</p><button class="bubble-primary" data-action="start">开始游戏 <span>→</span></button><button class="bubble-text-button bubble-guest-start" data-action="guest">访客试玩 · 不保存奖励</button><small>3 条初始生命 · 5 个神秘奖励</small></div>
-        <div class="bubble-feast-hud" role="status" hidden><span>✦ 全色可吃</span><b>8.0s</b><i><em></em></i></div><div class="bubble-joystick" aria-label="移动摇杆"><div class="joystick-ring" role="img" aria-label="拖动摇杆移动，小幅推动慢速，松手停下"><i></i><b>✦</b></div><span>轻推慢走 · 松手停</span></div>
+        <div class="bubble-feast-hud" role="status" hidden><span>✦ 全色可吃</span><b>8.0s</b><i><em></em></i></div><div class="bubble-joystick" aria-label="移动摇杆"><div class="joystick-ring" role="img" aria-label="拖动摇杆移动，轻推立即移动，松手停下"><i></i><b>✦</b></div><span>轻推即动 · 松手停</span></div>
         <div class="bubble-reward-toast" role="status" hidden><img alt=""/><div><small>NEW REWARD</small><strong></strong></div><button data-action="bag">去背包 ↗</button></div>
-      </div><footer class="bubble-board-footer"><div class="bubble-palette" aria-label="七种颜色的色号">${COLORS.map((c, i) => `<span style="--bubble-color:${c.hex}" title="${i + 1} / ${c.name}">${i + 1}</span>`).join('')}</div><span class="bubble-desktop-hint">方向键 / WASD 移动 · ESC 暂停</span><span class="bubble-mobile-hint">右下摇杆移动 · Ⅱ 调灵敏度</span></footer>
+      </div><footer class="bubble-board-footer"><div class="bubble-palette" aria-label="七种颜色的色号">${COLORS.map((c, i) => `<span style="--bubble-color:${c.hex}" title="${i + 1} / ${c.name}">${i + 1}</span>`).join('')}</div><span class="bubble-desktop-hint">方向键 / WASD 移动 · ESC 暂停</span><span class="bubble-mobile-hint">右下摇杆移动 · Ⅱ 控制设置</span></footer>
     </section><aside class="bubble-sidebar" aria-label="计分板和奖励进度"><div class="bubble-score-card"><div class="score-heading"><span>SCORE / 本局得分</span><i>✦</i></div><strong id="bubble-score">00</strong><div class="bubble-lives" aria-label="剩余 3 条生命">${heart.repeat(MAX_LIVES)}</div><div class="bubble-small-stats"><span>本机最高 <b id="bubble-best">0</b></span><span>本局 <b id="bubble-time">00:00</b></span></div></div>
       <div class="bubble-next-reward"><div><span>下一个小惊喜</span><b id="bubble-next-label">10 分</b></div><strong id="bubble-next-name">奖励一</strong><div class="bubble-goal-meter"><i></i></div></div>
       <div class="bubble-roadmap"><div class="roadmap-heading"><span>THE LITTLE REWARDS</span><span>01—05</span></div>${REWARDS.map((r, i) => `<div class="bubble-milestone" data-reward="${r.id}"><span class="milestone-number">${String(i + 1).padStart(2, '0')}</span><span class="milestone-copy"><strong>${rewardPresentation({ unlocked: [] }, r).name}</strong><small>${r.score} 分解锁</small></span><b>○</b></div>`).join('')}</div>
@@ -24,8 +24,8 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
     </aside></div>
     <div class="bubble-bottom-note bubble-chrome"><span>01 / GAME DEVELOPMENT</span><span>STAY CURIOUS. PLAY A LITTLE.</span></div>
     <div class="bubble-layer" hidden>
-      <section class="bubble-modal bubble-backpack" data-layer="bag" role="dialog" aria-modal="true" aria-labelledby="bag-title" hidden><div class="bubble-modal-top"><span>YOUR LITTLE COLLECTION</span><button data-action="close-layer" aria-label="关闭背包">✕</button></div><div class="bag-heading"><div><h2 id="bag-title">小小背包<span>.</span></h2><p>把每一次努力，装成一份惊喜。</p></div><span class="bag-count-heading">0 / 5</span></div><div class="bag-grid"></div><div class="bag-footer"><div class="bag-tools"><button data-action="original">使用原始泡泡</button><button data-action="guest">访客试玩</button><button class="bag-reset-button" data-action="reset-bag">重置背包</button></div><small class="bag-storage-note">奖励只保存在此浏览器，别人打开链接不会继承。</small></div></section>
-      <section class="bubble-modal bubble-pause" data-layer="pause" role="dialog" aria-modal="true" aria-labelledby="bubble-pause-title" hidden><span class="bubble-eyebrow">A LITTLE BREATHER</span><div class="pause-avatar"><img src="${art.bubble}" alt="休息中的泡泡"/></div><h2 id="bubble-pause-title">休息一下，再出发。</h2><p>分数和生命都在原地等你。</p><div class="bubble-control-settings"><label for="bubble-sensitivity">摇杆灵敏度 <output for="bubble-sensitivity">100%</output></label><input id="bubble-sensitivity" type="range" min="0.65" max="1.35" step="0.05" value="1"/><small>向左更细腻，向右更灵敏。松手立即停止。</small></div><div class="bubble-pickup-guide"><span>♥ 红心：+1 生命，最多 5 条</span><span>✦ 彩虹星：8 秒内可吃所有颜色</span><span>● 黑色炸弹：立即结束本局</span></div><button class="bubble-primary" data-action="resume">继续游戏 <span>→</span></button><button class="bubble-secondary" data-action="bag">看看我的背包</button></section>
+      <section class="bubble-modal bubble-backpack" data-layer="bag" role="dialog" aria-modal="true" aria-labelledby="bag-title" hidden><div class="bubble-modal-top"><span>YOUR LITTLE COLLECTION</span><button data-action="close-layer" aria-label="关闭背包">✕</button></div><div class="bag-heading"><div><h2 id="bag-title">小小背包<span>.</span></h2><p>把每一次努力，装成一份惊喜。</p></div><span class="bag-count-heading">0 / 5</span></div><div class="bag-grid"></div><div class="bag-footer"><div class="bag-tools"><button data-action="original">使用原始泡泡</button><button data-action="night">还原夜色背景</button><button data-action="guest">访客试玩</button><button class="bag-reset-button" data-action="reset-bag">重置背包</button></div><small class="bag-storage-note">奖励只保存在此浏览器，别人打开链接不会继承。</small></div></section>
+      <section class="bubble-modal bubble-pause" data-layer="pause" role="dialog" aria-modal="true" aria-labelledby="bubble-pause-title" hidden><span class="bubble-eyebrow">A LITTLE BREATHER</span><div class="pause-avatar"><img src="${art.bubble}" alt="休息中的泡泡"/></div><h2 id="bubble-pause-title">休息一下，再出发。</h2><p>分数和生命都在原地等你。</p><div class="bubble-control-settings"><div class="bubble-control-modes" aria-label="摇杆响应模式"><button data-control-mode="fast" aria-pressed="true">快速跟手</button><button data-control-mode="fine" aria-pressed="false">精细微调</button></div><label for="bubble-sensitivity">移动速度 <output for="bubble-sensitivity">115%</output></label><input id="bubble-sensitivity" type="range" min="0.8" max="1.6" step="0.05" value="1.15"/><small>快速：轻推即全速。精细：按推动幅度变速。松手立即停。</small></div><div class="bubble-pickup-guide"><span>♥ 红心：+1 生命，最多 5 条</span><span>✦ 彩虹星：8 秒内可吃所有颜色</span><span>● 黑色炸弹：立即结束本局</span></div><button class="bubble-primary" data-action="resume">继续游戏 <span>→</span></button><button class="bubble-secondary" data-action="bag">看看我的背包</button></section>
       <section class="bubble-modal bubble-reset" data-layer="reset" role="dialog" aria-modal="true" aria-labelledby="bubble-reset-title" hidden><span class="bubble-eyebrow">A FRESH LITTLE START</span><h2 id="bubble-reset-title">重新收集惊喜？</h2><p class="reset-summary"></p><button class="bubble-secondary" data-action="cancel-reset">保留背包</button><button class="bubble-primary" data-action="confirm-reset">确认重置背包 <span>↻</span></button></section>
       <section class="bubble-modal bubble-over" data-layer="over" role="dialog" aria-modal="true" aria-labelledby="bubble-over-title" hidden><span class="bubble-eyebrow">EVERY POP IS A NEW BEGINNING</span><h2 id="bubble-over-title">泡泡休息了，<br>快乐还在继续。</h2><div class="over-score"><strong>0</strong><span>本局得分</span></div><p class="over-summary"></p><button class="bubble-primary" data-action="start">再来一局 <span>→</span></button><button class="bubble-secondary" data-action="bag">打开我的背包</button><button class="bubble-text-button" data-action="exit">返回主页 ↗</button></section>
       <section class="bubble-celebration" data-layer="celebrate" role="dialog" aria-modal="true" aria-labelledby="celebrate-title" hidden><span>FIFTY LITTLE MOMENTS OF JOY</span><h2 id="celebrate-title">50 分！<br>这一刻，为你闪耀<span>✦</span></h2><p>你找到了最后一份小惊喜。</p><button class="bubble-primary" data-action="show-gift">查看我的礼盒 →</button></section>
@@ -39,11 +39,17 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
   const $ = selector => dialog.querySelector(selector), shell = $('.bubble-shell'), canvas = $('#bubble-canvas'), arena = $('.bubble-arena'), ctx = canvas.getContext('2d'), layerRoot = $('.bubble-layer');
   const reduced = matchMedia('(prefers-reduced-motion:reduce)').matches;
   const collection = createBackpackSession();
-  let bag = collection.open(), sensitivity = 1, state = null, open = false, layer = null, returnLayer = null, width = 1, height = 1, frame = null, last = 0, time = 0, lastHUD = 0, particles = [], floaters = [], pointerTarget = null, joystick = { x: 0, y: 0 }, stickPointer = null, stickOrigin = null, arenaPointer = null, numbers = true;
+  let bag = collection.open(), controlSpeed = 1.15, controlMode = 'fast', state = null, open = false, layer = null, returnLayer = null, width = 1, height = 1, frame = null, last = 0, time = 0, lastHUD = 0, particles = [], floaters = [], pointerTarget = null, joystick = { x: 0, y: 0 }, stickPointer = null, stickOrigin = null, arenaPointer = null, numbers = true;
   let rewardToastTimer, noticeTimer, overTimer, giftTimer, fireworks = null, fireTime = 0, fireActive = false, lastFocus = null;
   const audio = createBubbleAudio();
-  try { const stored = Number(localStorage.getItem('afterhours.bubble-stick.v1')); if (Number.isFinite(stored) && stored >= .65 && stored <= 1.35) sensitivity = stored; } catch {}
-  $('#bubble-sensitivity').value = sensitivity; $('.bubble-control-settings output').textContent = `${Math.round(sensitivity * 100)}%`;
+  try { const stored = JSON.parse(localStorage.getItem('afterhours.bubble-controls.v2')); if (stored?.mode === 'fine') controlMode = 'fine'; if (Number.isFinite(stored?.speed) && stored.speed >= .8 && stored.speed <= 1.6) controlSpeed = stored.speed; } catch {}
+  function renderControls() {
+    $('#bubble-sensitivity').value = controlSpeed; $('.bubble-control-settings output').textContent = `${Math.round(controlSpeed * 100)}%`;
+    dialog.querySelectorAll('button[data-control-mode]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.controlMode === controlMode)));
+    $('.bubble-joystick>span').textContent = controlMode === 'fast' ? '轻推即动 · 松手停' : '短行程微调 · 松手停'; shell.dataset.controlMode = controlMode;
+  }
+  function saveControls() { try { localStorage.setItem('afterhours.bubble-controls.v2', JSON.stringify({ mode: controlMode, speed: controlSpeed })); } catch {} renderControls(); }
+  renderControls();
   const keys = new Set();
   function notify(text) { $('.bubble-notice').textContent = text; $('.bubble-notice').hidden = false; clearTimeout(noticeTimer); noticeTimer = setTimeout(() => { $('.bubble-notice').hidden = true; }, 2300); }
   function persist() { const saved = collection.save(); shell.dataset.bag = JSON.stringify(bag); shell.dataset.mode = collection.mode; $('.bag-storage-note').textContent = saved === 'guest' ? '访客奖励仅本次试玩有效；退出后恢复个人背包。' : saved === 'saved' ? '奖励只保存在此浏览器，别人打开链接不会继承。' : '浏览器暂不支持保存，奖励保留在本次会话。'; }
@@ -69,12 +75,15 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
     }
     $('.bag-grid').innerHTML = REWARDS.map(reward => {
       const view = rewardPresentation(bag, reward), owned = view.owned;
-      const active = reward.type === 'skin' ? bag.skin === reward.id : reward.id === 'sky' && bag.background === 'sky';
-      const picture = !owned ? MYSTERY_SVG : reward.id === 'gift' ? (bag.voucher ? DURIAN_SVG : GIFT_SVG) : `<img src="${art[reward.id]}" alt="${view.name}"/>`;
-      const label = !owned ? `${reward.score} 分解锁` : reward.id === 'gift' ? bag.voucher ? '查看兑换券' : '打开礼盒' : reward.id === 'sky' ? active ? '还原夜色' : '使用背景' : active ? '正在使用 ✓' : '使用外观';
-      return `<article class="bag-item ${owned ? 'owned' : 'locked'} ${active ? 'equipped' : ''}"><div class="bag-item-art">${picture}<span>${owned ? active ? 'IN USE' : 'UNLOCKED' : 'LOCKED'}</span></div><h3>${view.name}</h3><p>${view.subtitle}</p><button data-item="${reward.id}" ${!owned || (active && reward.type === 'skin') ? 'disabled' : ''}>${label}</button></article>`;
+      const variants = REWARD_VARIANTS[reward.id];
+      const selected = reward.type === 'background' ? bag.background : bag.skin;
+      const active = variants ? variants.some(v => v.id === selected) : reward.type === 'skin' && bag.skin === reward.id;
+      const picture = !owned ? MYSTERY_SVG : variants ? variants.map(v => `<img src="${art[v.id]}" alt="${v.name}"/>`).join('') : reward.id === 'gift' ? (bag.voucher ? DURIAN_SVG : GIFT_SVG) : `<img src="${art[reward.id]}" alt="${view.name}"/>`;
+      const label = !owned ? `${reward.score} 分解锁` : reward.id === 'gift' ? bag.voucher ? '查看兑换券' : '打开礼盒' : active ? '正在使用 ✓' : '使用外观';
+      const choices = owned && variants ? `<div class="bag-variants">${variants.map(v => `<button data-item="${v.id}" aria-pressed="${selected === v.id}">${v.name}${selected === v.id ? ' ✓' : ''}</button>`).join('')}</div>` : `<button data-item="${reward.id}" ${!owned || (active && reward.type === 'skin') ? 'disabled' : ''}>${label}</button>`;
+      return `<article class="bag-item ${owned ? 'owned' : 'locked'} ${active ? 'equipped' : ''}"><div class="bag-item-art ${owned && variants ? 'duo' : ''}">${picture}<span>${owned ? active ? 'IN USE' : 'UNLOCKED' : 'LOCKED'}</span></div><h3>${view.name}</h3><p>${view.subtitle}</p>${choices}</article>`;
     }).join('');
-    $('[data-action="original"]').disabled = bag.skin === 'bubble';
+    $('[data-action="original"]').disabled = bag.skin === 'bubble'; $('[data-action="night"]').disabled = bag.background === 'night';
     shell.dataset.skin = bag.skin; shell.dataset.background = bag.background; shell.dataset.bag = JSON.stringify(bag);
     shell.dataset.mode = collection.mode;
     $('.bubble-wordmark small').textContent = collection.mode === 'guest' ? 'GUEST / 访客试玩 · 不保存奖励' : 'AFTERHOURS / PLAYROOM 01';
@@ -174,7 +183,8 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
   function input() {
     const dx = (keys.has('right') ? 1 : 0) - (keys.has('left') ? 1 : 0), dy = (keys.has('down') ? 1 : 0) - (keys.has('up') ? 1 : 0);
     if (pointerTarget) return { target: pointerTarget };
-    return { x: dx || joystick.x, y: dy || joystick.y };
+    if (dx || dy) return { x: dx, y: dy };
+    return { x: joystick.x, y: joystick.y, speedScale: controlSpeed };
   }
   function render(dt) {
     drawBackground(ctx, width, height, bag.background, reduced ? 0 : time);
@@ -182,14 +192,14 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
       for (const bubble of state.bubbles) {
         ctx.save(); ctx.globalAlpha = Math.min(1, bubble.age / .3, Math.max(0, 40 - bubble.age));
         const grow = .7 + Math.min(1, bubble.age / .35) * .3;
-        drawCharacter(ctx, bag.skin, bubble.color, bubble.x, bubble.y, bubble.radius * grow, time, { numbers }); ctx.restore();
+        drawCharacter(ctx, bag.skin, bubble.color, bubble.x, bubble.y, bubble.radius * grow, reduced ? 0 : time, { numbers }); ctx.restore();
       }
       for (const pickup of state.pickups) {
         ctx.save(); ctx.globalAlpha = Math.min(1, pickup.age / .55, Math.max(0, pickup.ttl - pickup.age));
         drawPickup(ctx, pickup.type, pickup.x, pickup.y, pickup.radius, reduced ? 0 : time); ctx.restore();
       }
       if (pointerTarget && !layer) { ctx.strokeStyle = bag.background === 'sky' ? '#3d789055' : '#b3deff55'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(pointerTarget.x, pointerTarget.y, 7, 0, Math.PI * 2); ctx.stroke(); }
-      if (state.status !== 'over') drawCharacter(ctx, bag.skin, state.player.color, state.player.x, state.player.y, state.player.radius, time, { player: true, protection: state.protection, feast: state.feastRemaining > 0, numbers, lightBackground: bag.background === 'sky' });
+      if (state.status !== 'over') drawCharacter(ctx, bag.skin, state.player.color, state.player.x, state.player.y, state.player.radius, reduced ? 0 : time, { player: true, protection: state.protection, feast: state.feastRemaining > 0, numbers, lightBackground: bag.background === 'sky' });
     }
     for (const p of particles) {
       p.age += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 30 * dt;
@@ -228,8 +238,10 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
     const item = event.target.closest('[data-item]');
     if (item && !item.disabled) {
       if (item.dataset.item === 'gift') { if (bag.voucher) { returnLayer = 'bag'; showLayer('coupon'); } else showGift(); }
-      else if (useReward(bag, item.dataset.item)) { persist(); updateInventoryUI(); audio.cue('equip'); }
+      else if (useReward(bag, item.dataset.item)) { const id = item.dataset.item; persist(); updateInventoryUI(); audio.cue('equip'); $(`[data-item="${id}"]`)?.focus({ preventScroll: true }); }
     }
+    const mode = event.target.closest('button[data-control-mode]')?.dataset.controlMode;
+    if (mode) { controlMode = mode === 'fine' ? 'fine' : 'fast'; saveControls(); }
     const action = event.target.closest('[data-action]')?.dataset.action;
     if (action === 'exit') onExit?.();
     if (action === 'start') start();
@@ -237,6 +249,7 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
     if (action === 'close-layer' || action === 'resume') closeLayer();
     if (action === 'pause' && state?.status === 'playing') showLayer('pause');
     if (action === 'original') { useReward(bag, 'bubble'); persist(); updateInventoryUI(); }
+    if (action === 'night') { useReward(bag, 'night'); persist(); updateInventoryUI(); audio.cue('equip'); }
     if (action === 'sound') toggleSound();
     if (action === 'guest') {
       bag = collection.mode === 'guest' ? collection.leaveGuest() : collection.enterGuest(); resetReady();
@@ -253,8 +266,7 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
   });
   $('#bubble-numbers').addEventListener('change', event => { numbers = event.target.checked; });
   $('#bubble-sensitivity').addEventListener('input', event => {
-    sensitivity = Number(event.target.value); $('.bubble-control-settings output').textContent = `${Math.round(sensitivity * 100)}%`;
-    try { localStorage.setItem('afterhours.bubble-stick.v1', String(sensitivity)); } catch {}
+    controlSpeed = Number(event.target.value); saveControls();
   });
   const keyMap = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', w: 'up', s: 'down', a: 'left', d: 'right' };
   dialog.addEventListener('keydown', event => {
@@ -273,17 +285,18 @@ export function createBubbleGarden({ onExit, random = Math.random }) {
   function updateStick(event) {
     const dx = event.clientX - stickOrigin.x, dy = event.clientY - stickOrigin.y, length = Math.hypot(dx, dy), maximum = 32;
     const factor = length > maximum ? maximum / length : 1, x = dx * factor, y = dy * factor;
-    joystick = joystickVector(dx, dy, maximum, sensitivity); $('.joystick-ring b').style.transform = `translate(${x}px,${y}px)`;
+    joystick = joystickVector(dx, dy, 18, controlMode); $('.joystick-ring b').style.transform = `translate(${x}px,${y}px)`;
   }
-  const stickRing = $('.joystick-ring');
-  stickRing.addEventListener('pointerdown', event => {
+  const stickRing = $('.joystick-ring'), stickSurface = $('.bubble-joystick');
+  stickSurface.addEventListener('pointerdown', event => {
     if (layer || state?.status !== 'playing' || stickPointer !== null || arenaPointer !== null) return;
-    event.preventDefault(); stickPointer = event.pointerId; stickRing.setPointerCapture(event.pointerId); pointerTarget = null;
-    // Anchor to the first thumb contact inside the fixed ring: no jump on an off-center press.
-    stickOrigin = { x: event.clientX, y: event.clientY }; $('.bubble-joystick').classList.add('active'); updateStick(event);
+    event.preventDefault(); stickPointer = event.pointerId; stickSurface.setPointerCapture(event.pointerId); pointerTarget = null;
+    // The visual center is the actual center: touching a direction responds immediately.
+    const bounds = stickRing.getBoundingClientRect();
+    stickOrigin = { x: bounds.left + bounds.width / 2, y: bounds.top + bounds.height / 2 }; $('.bubble-joystick').classList.add('active'); updateStick(event);
   });
-  stickRing.addEventListener('pointermove', event => { if (event.pointerId === stickPointer) updateStick(event); });
-  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) stickRing.addEventListener(type, event => { if (event.pointerId === stickPointer) clearInput(); });
+  stickSurface.addEventListener('pointermove', event => { if (event.pointerId === stickPointer) updateStick(event); });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) stickSurface.addEventListener(type, event => { if (event.pointerId === stickPointer) clearInput(); });
   canvas.addEventListener('pointerdown', event => {
     if (layer || state?.status !== 'playing' || arenaPointer !== null || stickPointer !== null) return;
     event.preventDefault(); arenaPointer = event.pointerId; canvas.setPointerCapture(event.pointerId);

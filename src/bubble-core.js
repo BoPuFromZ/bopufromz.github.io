@@ -10,10 +10,14 @@ export const COLORS = [
 export const REWARDS = [
   { id: 'frog', score: 10, name: '七色小青蛙', type: 'skin', subtitle: '蹦进一场彩色冒险', skin: 'frog' },
   { id: 'pig', score: 20, name: '七色小猪猪', type: 'skin', subtitle: '把快乐装进小鼻子', skin: 'pig' },
-  { id: 'sky', score: 30, name: '蓝天白云', type: 'background', subtitle: '换一片晴朗的天空' },
-  { id: 'mermaid', score: 40, name: '七色小美人鱼', type: 'skin', subtitle: '让每一次游动都闪亮', skin: 'mermaid' },
+  { id: 'sky', score: 30, name: '晴空与海洋', type: 'background', subtitle: '两片风景，随心切换' },
+  { id: 'mermaid', score: 40, name: '美人鱼与森林仙女', type: 'skin', subtitle: '两款七色角色，游动或轻盈飞翔', skin: 'mermaid' },
   { id: 'gift', score: 50, name: '榴莲兑换券', type: 'voucher', subtitle: '藏在礼盒里的小惊喜' },
 ];
+export const REWARD_VARIANTS = {
+  sky: [{ id: 'sky', name: '蓝天白云' }, { id: 'ocean', name: '海洋背景' }],
+  mermaid: [{ id: 'mermaid', name: '小美人鱼' }, { id: 'fairy', name: '森林仙女' }],
+};
 export const BAG_KEY = 'afterhours.bubble-garden.v1';
 export function rewardPresentation(bag, reward) {
   const owned = reward.id === 'gift' ? bag.giftEarned : bag.unlocked.includes(reward.id);
@@ -24,8 +28,8 @@ export function rewardPresentation(bag, reward) {
 export function createBag(value = {}) {
   value = value && typeof value === 'object' ? value : {};
   const unlocked = REWARDS.slice(0, 4).filter(r => Array.isArray(value.unlocked) && value.unlocked.includes(r.id)).map(r => r.id);
-  const skin = ['frog', 'pig', 'mermaid'].includes(value.skin) && unlocked.includes(value.skin) ? value.skin : 'bubble';
-  return { version: 1, unlocked, skin, background: value.background === 'sky' && unlocked.includes('sky') ? 'sky' : 'night',
+  const skin = ['frog', 'pig', 'mermaid', 'fairy'].includes(value.skin) && unlocked.includes(value.skin === 'fairy' ? 'mermaid' : value.skin) ? value.skin : 'bubble';
+  return { version: 1, unlocked, skin, background: ['sky', 'ocean'].includes(value.background) && unlocked.includes('sky') ? value.background : 'night',
     giftEarned: value.giftEarned === true || value.voucher === true, voucher: value.voucher === true,
     bestScore: Number.isFinite(value.bestScore) ? Math.max(0, Math.min(100000, Math.floor(value.bestScore))) : 0 };
 }
@@ -49,11 +53,13 @@ export function createBackpackSession({ storage } = {}) {
     reset() { bag = createBag({ bestScore: bag.bestScore }); save(); return bag; },
   };
 }
-export function joystickVector(dx, dy, travel = 32, sensitivity = 1) {
-  if (![dx, dy, travel, sensitivity].every(Number.isFinite) || travel <= 0) return { x: 0, y: 0 };
-  const length = Math.hypot(dx, dy), radial = Math.min(1, length / travel);
-  if (radial <= .12) return { x: 0, y: 0 };
-  const amount = Math.min(1, Math.pow((radial - .12) / .88, 1.4) * Math.max(.65, Math.min(1.35, sensitivity)));
+export function joystickVector(dx, dy, travel = 18, mode = 'fast') {
+  if (![dx, dy, travel].every(Number.isFinite) || travel <= 2) return { x: 0, y: 0 };
+  const length = Math.hypot(dx, dy);
+  if (length <= 2) return { x: 0, y: 0 };
+  // Fast mode responds at full speed on the first intentional push. Fine mode
+  // still reaches full speed after a short stroke, without the old sluggish ramp.
+  const amount = mode === 'fine' ? Math.pow(Math.min(1, (length - 2) / (travel - 2)), .75) : 1;
   return { x: dx / length * amount, y: dy / length * amount };
 }
 export const MAX_LIVES = 5;
@@ -71,9 +77,11 @@ export function unlockRewards(bag, score) {
 }
 export function useReward(bag, id) {
   if (id === 'bubble') { bag.skin = 'bubble'; return true; }
-  if (!bag.unlocked.includes(id)) return false;
-  if (id === 'sky') bag.background = bag.background === 'sky' ? 'night' : 'sky';
-  else if (['frog', 'pig', 'mermaid'].includes(id)) bag.skin = id;
+  if (id === 'night') { bag.background = 'night'; return true; }
+  const owner = id === 'ocean' ? 'sky' : id === 'fairy' ? 'mermaid' : id;
+  if (!bag.unlocked.includes(owner)) return false;
+  if (['sky', 'ocean'].includes(id)) bag.background = id;
+  else if (['frog', 'pig', 'mermaid', 'fairy'].includes(id)) bag.skin = id;
   else return false;
   return true;
 }
@@ -138,7 +146,8 @@ export function stepBubbleGame(state, input = {}, dt = 0) {
   state.feastRemaining = Math.max(0, state.feastRemaining - dt);
   let dx = Number.isFinite(input.x) ? input.x : 0, dy = Number.isFinite(input.y) ? input.y : 0;
   const player = state.player;
-  const speed = Math.max(175, Math.min(275, state.width * .4));
+  const speedScale = Number.isFinite(input.speedScale) ? Math.max(.8, Math.min(1.6, input.speedScale)) : 1;
+  const speed = Math.max(175, Math.min(275, state.width * .4)) * speedScale;
   if (input.target && Number.isFinite(input.target.x) && Number.isFinite(input.target.y)) {
     dx = input.target.x - player.x; dy = input.target.y - player.y;
     const length = Math.hypot(dx, dy);
