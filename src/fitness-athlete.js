@@ -5,7 +5,7 @@ import { BODY, solveJoint } from './fitness-motion.js';
 
 let source;
 export async function createAthlete() {
-  source ||= new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}models/fitness-athlete.glb`).catch(error => { source = null; throw error; });
+  source ||= new GLTFLoader().loadAsync(`${import.meta.env.BASE_URL}models/fitness-athlete.glb?v=0c68e0e7`).catch(error => { source = null; throw error; });
   const gltf = await source, root = clone(gltf.scene); root.name = 'DeadliftAthlete'; root.userData.design = 'natural-athlete-v3';
   const bones = new Map(), up = new THREE.Vector3(0, 1, 0);
   root.updateMatrixWorld(true);
