@@ -6,7 +6,7 @@ export const DEADLIFT_STEPS = [
   { title: '放下', short: '放下', duration: .72, detail: '干净回落，控制杠铃落到硬拉台。' },
 ];
 export const BAR = { floorHeight: .34, z: -.2, grip: .43, shaftWeight: 20, platesPerSide: [20, 20, 20, 20, 10] };
-export const BODY = { torso: .6, upperLeg: .461, lowerLeg: .451, upperArm: .357, lowerArm: .357 };
+export const BODY = { torso: .64, upperLeg: .49, lowerLeg: .49, upperArm: .305, lowerArm: .313, shoulderWidth: .225, shoulderDrop: .10, hipWidth: .135, gripRise: .065, gripBack: .027 };
 const clamp = value => Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
 export const smooth = value => { const t = clamp(value); return t * t * (3 - 2 * t); };
 // Brief tension build-up, a fast drive, then a firm stop without a bar overshoot.
@@ -25,15 +25,18 @@ function bodyPose(hipY, hipZ, pitch) {
   return { hips, shoulders: [0, hipY + Math.cos(pitch) * BODY.torso, hipZ - Math.sin(pitch) * BODY.torso], pitch };
 }
 const standing = () => bodyPose(1.048, .015, 0);
-const preloading = () => bodyPose(.72, .42, 1.048);
+const preloading = () => bodyPose(.72, .42, 1.08);
 const pre = preloading();
-const armReach = Math.hypot(.17, pre.shoulders[1] - BAR.floorHeight, pre.shoulders[2] - BAR.z);
+function armOrigin(pose) { return [0, pose.shoulders[1] - Math.cos(pose.pitch) * BODY.shoulderDrop, pose.shoulders[2] + Math.sin(pose.pitch) * BODY.shoulderDrop]; }
+const preArm = armOrigin(pre);
+const armReach = Math.hypot(BAR.grip - BODY.shoulderWidth, preArm[1] - BAR.floorHeight - BODY.gripRise, preArm[2] - BAR.z - BODY.gripBack);
 function liftPose(progress) {
   const p = clamp(progress), hipY = mix(.72, 1.048, p), hipZ = mix(.42, .015, p);
-  const pitch = 1.048 * (1 - smooth((p - .15) / .85));
+  const pitch = 1.08 * (1 - smooth((p - .15) / .85));
   const pose = bodyPose(hipY, hipZ, pitch);
-  const drop = Math.sqrt(Math.max(0, armReach ** 2 - .17 ** 2 - (pose.shoulders[2] - BAR.z) ** 2));
-  return { ...pose, barY: p === 0 ? BAR.floorHeight : Math.max(BAR.floorHeight, pose.shoulders[1] - drop) };
+  const shoulder = armOrigin(pose);
+  const drop = Math.sqrt(Math.max(0, armReach ** 2 - (BAR.grip - BODY.shoulderWidth) ** 2 - (shoulder[2] - BAR.z - BODY.gripBack) ** 2));
+  return { ...pose, barY: p === 0 ? BAR.floorHeight : Math.max(BAR.floorHeight, shoulder[1] - drop - BODY.gripRise) };
 }
 
 export function createDeadliftState() { return { completed: 0, step: 0, elapsed: 0, progress: 0, running: false }; }
@@ -54,8 +57,8 @@ export function advanceDeadlift(state, dt) {
 export function sampleDeadliftPose(step = 0, progress = 0) {
   const p = step >= 4 ? powerProgress(progress) : smooth(progress);
   let pose = standing(), root = [-2.65, 0, .95], yaw = -1.1, barY = BAR.floorHeight, grippingBar = false;
-  const ankles = [[-.23, .14, -.05], [.23, .14, -.05]];
-  let hands = [[-.35, 1.025, .08], [.35, 1.025, .08]];
+  const ankles = [[-.23, .085, -.05], [.23, .085, -.05]];
+  let hands = [[-.35, 1.05, .08], [.35, 1.05, .08]], wristOffset = 0;
   if (step === 1) {
     root = mixPoint([-2.65, 0, .95], [0, 0, 0], p); yaw = mix(-1.1, 0, smooth((progress - .7) / .3));
     const fade = Math.sin(Math.PI * clamp(progress)), gait = Math.sin(clamp(progress) * Math.PI * 4);
@@ -67,23 +70,25 @@ export function sampleDeadliftPose(step = 0, progress = 0) {
   } else if (step >= 2) {
     root = [0, 0, 0]; yaw = 0;
     if (step === 2) {
-      pose = bodyPose(mix(1.048, .72, p), mix(.015, .42, p), mix(0, 1.13, p));
+      pose = bodyPose(mix(1.048, .72, p), mix(.015, .42, p), mix(0, 1.16, p)); wristOffset = p;
       hands = [-1, 1].map(sign => {
         const x = sign * mix(.35, BAR.grip, p), z = mix(.08, BAR.z, smooth((p - .15) / .85));
-        const drop = Math.sqrt(Math.max(0, .703 ** 2 - (Math.abs(x) - .26) ** 2 - (z - pose.shoulders[2]) ** 2)) * mix(.90, 1, p);
-        return [x, Math.max(BAR.floorHeight, pose.shoulders[1] - drop), z];
+        const shoulder = armOrigin(pose), drop = Math.sqrt(Math.max(0, .612 ** 2 - (Math.abs(x) - BODY.shoulderWidth) ** 2 - (z + BODY.gripBack * p - shoulder[2]) ** 2)) * mix(.90, 1, p);
+        return [x, Math.max(BAR.floorHeight, shoulder[1] - drop - BODY.gripRise * p), z];
       });
       if (p === 1) { hands = [-1, 1].map(sign => [sign * BAR.grip, BAR.floorHeight, BAR.z]); grippingBar = true; }
     } else {
-      grippingBar = true;
-      if (step === 3) pose = bodyPose(.72, .42, mix(1.13, 1.048, p));
+      grippingBar = true; wristOffset = 1;
+      if (step === 3) pose = bodyPose(.72, .42, mix(1.16, 1.08, p));
       else { pose = liftPose(step === 4 ? p : 1 - p); barY = pose.barY; }
       hands = [-1, 1].map(sign => [sign * BAR.grip, barY, BAR.z]);
     }
   }
-  const shoulderJoints = [-1, 1].map(sign => [sign * .26, pose.shoulders[1], pose.shoulders[2]]);
-  const hipJoints = [-1, 1].map(sign => [sign * .22, pose.hips[1], pose.hips[2]]);
-  return { ...pose, root, yaw, barY, hands, ankles, shoulderJoints, hipJoints, grippingBar };
+  const armStart = armOrigin(pose);
+  const shoulderJoints = [-1, 1].map(sign => [sign * BODY.shoulderWidth, armStart[1], armStart[2]]);
+  const hipJoints = [-1, 1].map(sign => [sign * BODY.hipWidth, pose.hips[1], pose.hips[2]]);
+  const wristJoints = hands.map(hand => [hand[0], hand[1] + BODY.gripRise * wristOffset, hand[2] + BODY.gripBack * wristOffset]);
+  return { ...pose, root, yaw, barY, hands, ankles, shoulderJoints, hipJoints, wristJoints, grippingBar, gripAmount: step >= 3 ? 1 : step === 2 ? smooth((progress - .55) / .45) : 0 };
 }
 
 // Analytic two-bone joints keep elbows and knees articulated without stretching.
@@ -99,3 +104,4 @@ export function solveJoint(start, end, upper, lower, bendHint) {
   const height = Math.sqrt(Math.max(0, upper ** 2 - along ** 2));
   return start.map((v, i) => v + axis[i] * along + bend[i] * height);
 }
+

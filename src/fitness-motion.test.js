@@ -23,7 +23,7 @@ test('hands follow the same bar coordinates throughout preload, pull and lowerin
   for (let step = 3; step <= 5; step++) for (let i = 0; i <= 20; i++) {
     const pose = sampleDeadliftPose(step, i / 20);
     pose.hands.forEach((hand, side) => assert.deepEqual(hand, [(side ? 1 : -1) * BAR.grip, pose.barY, BAR.z]));
-    assert.deepEqual(pose.ankles, [[-.23, .14, -.05], [.23, .14, -.05]]);
+    assert.deepEqual(pose.ankles, [[-.23, .085, -.05], [.23, .085, -.05]]);
     assert.ok(Math.abs(distance(pose.hips, pose.shoulders) - BODY.torso) < 1e-8);
   }
 });
@@ -63,7 +63,7 @@ test('all animated arm and leg targets remain reachable with finite joints', () 
   for (let step = 0; step <= 5; step++) for (let i = 0; i <= 30; i++) {
     const pose = sampleDeadliftPose(step, i / 30);
     for (let side = 0; side < 2; side++) {
-      const shoulder = pose.shoulderJoints[side], hand = pose.hands[side];
+      const shoulder = pose.shoulderJoints[side], hand = pose.wristJoints[side];
       assert.ok(distance(shoulder, hand) <= BODY.upperArm + BODY.lowerArm + 1e-5, `Arm reach: step ${step}, frame ${i}`);
       const elbow = solveJoint(shoulder, hand, BODY.upperArm, BODY.lowerArm, [side ? 1 : -1, 0, 1]);
       assert.ok(elbow.every(Number.isFinite));
@@ -72,3 +72,4 @@ test('all animated arm and leg targets remain reachable with finite joints', () 
     }
   }
 });
+

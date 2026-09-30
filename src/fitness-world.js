@@ -4,7 +4,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { BAR, createDeadliftState, beginDeadliftStep, advanceDeadlift, sampleDeadliftPose } from './fitness-motion.js';
 import { createAthlete } from './fitness-athlete.js';
 
-export function createFitnessWorld({ mount, onState, onError }) {
+export async function createFitnessWorld({ mount, onState, onError }) {
+  const athlete = await createAthlete();
   const mobile = matchMedia('(max-width:800px)').matches;
   const idleMotion = !matchMedia('(prefers-reduced-motion:reduce)').matches;
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
@@ -94,7 +95,7 @@ export function createFitnessWorld({ mount, onState, onError }) {
     const collar = mesh(new THREE.CylinderGeometry(.065, .065, .07, 20), material(0xb4ac89, .35, .85), [sign * 1.27, 0, 0], bar); collar.rotation.z = Math.PI / 2;
   }
 
-  const athlete = createAthlete(); stage.add(athlete.root);
+  stage.add(athlete.root);
   mount.dataset.character = athlete.root.userData.design;
   function applyPose(pose) {
     athlete.apply(pose); bar.position.y = pose.barY;
@@ -144,3 +145,4 @@ export function createFitnessWorld({ mount, onState, onError }) {
     },
   };
 }
+

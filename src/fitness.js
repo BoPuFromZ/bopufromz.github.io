@@ -23,7 +23,7 @@ export function createFitnessStage({ onExit, onRecords }) {
   </div>`;
   document.body.append(dialog);
   const $ = selector => dialog.querySelector(selector), viewport = $('#fitness-viewport'), next = $('#fitness-next');
-  let world = null, observer = null;
+  let world = null, observer = null, opening = 0;
   function update(state) {
     dialog.dataset.state = JSON.stringify(state);
     const done = state.completed === DEADLIFT_STEPS.length, index = state.running ? state.step - 1 : state.completed, step = DEADLIFT_STEPS[index];
@@ -41,13 +41,15 @@ export function createFitnessStage({ onExit, onRecords }) {
       item.querySelector('i').textContent = completed ? '✓' : current ? '•' : '';
     });
   }
-  function boot() {
+  async function boot() {
+    const token = ++opening;
     $('.fitness-error').hidden = true; $('.fitness-loading').hidden = false; next.disabled = true;
     try {
-      world = createFitnessWorld({ mount: viewport, onState: update, onError() { $('.fitness-error').hidden = false; next.disabled = true; } });
+      const loaded = await createFitnessWorld({ mount: viewport, onState: state => { if (token === opening) update(state); }, onError() { if (token === opening) { $('.fitness-error').hidden = false; next.disabled = true; } } });
+      if (token !== opening || !dialog.open) { loaded.dispose(); return; } world = loaded;
       observer = new MutationObserver(() => { if (viewport.dataset.ready) { $('.fitness-loading').hidden = true; observer.disconnect(); } });
       observer.observe(viewport, { attributes: true, attributeFilter: ['data-ready'] });
-    } catch (error) { console.error('Fitness scene failed:', error); $('.fitness-loading').hidden = true; $('.fitness-error').hidden = false; next.disabled = true; }
+    } catch (error) { if (token !== opening) return; console.error('Fitness scene failed:', error); $('.fitness-loading').hidden = true; $('.fitness-error').hidden = false; next.disabled = true; }
   }
   dialog.addEventListener('click', event => {
     const action = event.target.closest('[data-fitness]')?.dataset.fitness;
@@ -61,6 +63,7 @@ export function createFitnessStage({ onExit, onRecords }) {
   dialog.addEventListener('cancel', event => { event.preventDefault(); onExit(); });
   return {
     open() { dialog.showModal(); boot(); next.focus({ preventScroll: true }); },
-    close() { observer?.disconnect(); world?.dispose(); world = null; dialog.close(); },
+    close() { ++opening; observer?.disconnect(); world?.dispose(); world = null; dialog.close(); },
   };
 }
+
