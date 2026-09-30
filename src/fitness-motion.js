@@ -6,7 +6,7 @@ export const DEADLIFT_STEPS = [
   { title: '放下', short: '放下', duration: .72, detail: '干净回落，控制杠铃落到硬拉台。' },
 ];
 export const BAR = { floorHeight: .34, z: -.2, grip: .43, shaftWeight: 20, platesPerSide: [20, 20, 20, 20, 10] };
-export const BODY = { torso: .64, upperLeg: .49, lowerLeg: .49, upperArm: .305, lowerArm: .313, shoulderWidth: .225, shoulderDrop: .10, hipWidth: .135, gripRise: .065, gripBack: .027 };
+export const BODY = { torso: .64, upperLeg: .49, lowerLeg: .49, upperArm: .305, lowerArm: .313, shoulderWidth: .225, shoulderDrop: .10, hipWidth: .135, gripRise: .112, gripBack: .027 };
 const clamp = value => Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
 export const smooth = value => { const t = clamp(value); return t * t * (3 - 2 * t); };
 // Brief tension build-up, a fast drive, then a firm stop without a bar overshoot.
