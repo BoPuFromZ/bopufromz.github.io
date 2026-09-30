@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { BAR, createDeadliftState, beginDeadliftStep, advanceDeadlift, sampleDeadliftPose } from './fitness-motion.js';
-import { createAthlete } from './fitness-athlete.js';
+import { createAthlete } from './fitness-goku.js';
 
 export async function createFitnessWorld({ mount, onState, onError }) {
   const athlete = await createAthlete();
@@ -145,4 +145,3 @@ export async function createFitnessWorld({ mount, onState, onError }) {
     },
   };
 }
-
