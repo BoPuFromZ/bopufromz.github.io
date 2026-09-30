@@ -61,6 +61,32 @@ export async function createAthlete() {
     }
     ref.bone.updateMatrixWorld(true);
   }
+  // Keep the FBX bone lengths intact and rotate the arm chain until the palm
+  // reaches the same grip point that drives the barbell animation.
+  function placeHandOnBar(side, grip, amount) {
+    if (amount <= 0) return;
+    const hand = bones.get(`hand${side}`);
+    const joints = [`forearm_stretch${side}`, `arm_stretch${side}`, `shoulder${side}`].map(name => bones.get(name));
+    const target = vector(grip).multiplyScalar(1 / MODEL_SCALE);
+    target.y += 6; // FBX hand bone sits at the wrist; the palm hangs below it.
+    hand.updateMatrixWorld(true);
+    target.lerpVectors(hand.getWorldPosition(new THREE.Vector3()), target, amount);
+    for (let pass = 0; pass < 14; pass++) {
+      for (const joint of joints) {
+        joint.updateMatrixWorld(true);
+        const pivot = joint.getWorldPosition(new THREE.Vector3());
+        const from = hand.getWorldPosition(new THREE.Vector3()).sub(pivot);
+        const to = target.clone().sub(pivot);
+        if (from.lengthSq() < 1e-6 || to.lengthSq() < 1e-6) continue;
+        const turn = new THREE.Quaternion().setFromUnitVectors(from.normalize(), to.normalize());
+        const parent = joint.parent.getWorldQuaternion(new THREE.Quaternion());
+        const worldRotation = joint.getWorldQuaternion(new THREE.Quaternion());
+        joint.quaternion.copy(parent.invert().multiply(turn).multiply(worldRotation));
+        joint.updateMatrixWorld(true);
+      }
+      if (hand.getWorldPosition(new THREE.Vector3()).distanceToSquared(target) < .25) break;
+    }
+  }
   function apply(pose) {
     root.position.set(0, 0, 0); root.rotation.y = 0;
     model.scale.setScalar(1);
@@ -83,6 +109,7 @@ export async function createAthlete() {
       aim(`arm_stretch${side}`, shoulderJoint, elbow);
       aim(`forearm_stretch${side}`, elbow, wrist);
       aim(`hand${side}`, wrist, hand.distanceToSquared(wrist) > .0025 ? hand : wrist.clone().add(new THREE.Vector3(0, -.09, 0)));
+      placeHandOnBar(side, pose.hands[i], pose.gripAmount);
       const hip = vector(pose.hipJoints[i]), ankle = vector(pose.ankles[i]);
       const knee = vector(solveJoint(pose.hipJoints[i], pose.ankles[i], BODY.upperLeg, BODY.lowerLeg, [0, 0, -1]));
       aim(`thigh_stretch${side}`, hip, knee);
