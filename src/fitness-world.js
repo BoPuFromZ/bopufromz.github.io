@@ -12,7 +12,7 @@ export async function createFitnessWorld({ mount, onState, onError }) {
   renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.25 : 1.6));
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
-  renderer.domElement.tabIndex = 0; renderer.domElement.setAttribute('aria-label', '三维硬拉台，200 公斤杠铃与可逐步演示动作的小人。拖动旋转，滚轮或双指缩放。');
+  renderer.domElement.tabIndex = 0; renderer.domElement.setAttribute('aria-label', '三维硬拉台，200 公斤杠铃与可逐步演示动作的悟空。拖动旋转，滚轮或双指缩放。');
   mount.append(renderer.domElement);
   const scene = new THREE.Scene(); scene.background = new THREE.Color(0x111b1b);
   const camera = new THREE.PerspectiveCamera(41, 1, .1, 80);

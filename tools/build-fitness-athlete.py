@@ -17,7 +17,7 @@ for file, remote in FILES.items():
 lines = (SOURCE / 'base.obj').read_text(encoding='utf8').splitlines()
 vertices = np.array([[float(x) for x in line.split()[1:4]] for line in lines if line.startswith('v ')])
 source_uvs = np.array([[float(x) for x in line.split()[1:3]] for line in lines if line.startswith('vt ')])
-for name, factor in [('asian.target', 1), ('muscle.target', .72), ('average.target', .28)]:
+for name, factor in [('asian.target', 1), ('muscle.target', .90), ('average.target', .10)]:
     for line in (SOURCE / name).read_text(encoding='utf8').splitlines():
         if not line or line.startswith('#'): continue
         parts = line.split(); vertices[int(parts[0])] += np.array([float(x) for x in parts[1:4]]) * factor
@@ -86,12 +86,12 @@ for name in names:
     a, b = refs[name]; q = quaternion_y(b - a); transform = np.eye(4); transform[:3, :3] = rotation(q); transform[:3, 3] = a
     inverses.append(np.linalg.inv(transform).T.reshape(16)); nodes.append({'name': name, 'translation': a.tolist(), 'rotation': q.tolist(), 'extras': {'referenceHead': a.tolist(), 'referenceTail': b.tolist()}})
 materials = [
-    {'name':'textured-skin', 'pbrMetallicRoughness':{'baseColorTexture':{'index':0},'metallicFactor':0,'roughnessFactor':.82}},
-    {'name':'midnight-compression-top', 'pbrMetallicRoughness':{'baseColorFactor':[.043,.064,.080,1],'metallicFactor':0,'roughnessFactor':.94}},
-    {'name':'charcoal-training-pants', 'pbrMetallicRoughness':{'baseColorFactor':[.038,.043,.048,1],'metallicFactor':0,'roughnessFactor':.96}},
-    {'name':'training-sneakers', 'pbrMetallicRoughness':{'baseColorFactor':[.15,.18,.18,1],'metallicFactor':0,'roughnessFactor':.85}},
-    {'name':'textured-crop', 'pbrMetallicRoughness':{'baseColorFactor':[.028,.025,.023,1],'metallicFactor':0,'roughnessFactor':1}},
-    {'name':'lifting-gloves', 'pbrMetallicRoughness':{'baseColorFactor':[.055,.06,.065,1],'metallicFactor':0,'roughnessFactor':.95}},
+    {'name':'anime-skin', 'pbrMetallicRoughness':{'baseColorFactor':[.73,.47,.33,1],'metallicFactor':0,'roughnessFactor':.91}},
+    {'name':'orange-gi', 'pbrMetallicRoughness':{'baseColorFactor':[.93,.205,.018,1],'metallicFactor':0,'roughnessFactor':.96}},
+    {'name':'orange-training-pants', 'pbrMetallicRoughness':{'baseColorFactor':[.83,.155,.015,1],'metallicFactor':0,'roughnessFactor':.97}},
+    {'name':'blue-boots', 'pbrMetallicRoughness':{'baseColorFactor':[.025,.065,.28,1],'metallicFactor':0,'roughnessFactor':.9}},
+    {'name':'black-spiky-hair-base', 'pbrMetallicRoughness':{'baseColorFactor':[.008,.011,.018,1],'metallicFactor':0,'roughnessFactor':1}},
+    {'name':'anime-hands', 'pbrMetallicRoughness':{'baseColorFactor':[.73,.47,.33,1],'metallicFactor':0,'roughnessFactor':.91}},
 ]
 part_indices = [[] for _ in materials]
 for tri in indices:
@@ -101,7 +101,7 @@ for tri in indices:
     for vertex in tri:
         for bone, weight in zip(skin_indices[vertex], skin_weights[vertex]): mass[bone] += weight
     region = names[int(mass.argmax())]
-    if region in ('torso', 'arm.L', 'arm.R', 'forearm.L', 'forearm.R'): part = 1
+    if region in ('torso', 'arm.L', 'arm.R'): part = 1
     elif region in ('pelvis', 'thigh.L', 'thigh.R', 'calf.L', 'calf.R'): part = 2
     elif region.startswith('foot.'): part = 3
     elif region.startswith(('hand.', 'finger')): part = 5
@@ -118,15 +118,15 @@ def accessor(array, component, kind, bounds=False):
     entry = {'bufferView':len(views)-1,'componentType':component,'count':len(array),'type':kind}
     if bounds: entry.update(min=array.min(0).tolist(),max=array.max(0).tolist())
     accessors.append(entry); return len(accessors)-1
-attributes = {'POSITION':accessor(positions,5126,'VEC3',True),'NORMAL':accessor(normals.astype('<f4'),5126,'VEC3'),'TEXCOORD_0':accessor(uvs,5126,'VEC2'),'JOINTS_0':accessor(skin_indices,5123,'VEC4'),'WEIGHTS_0':accessor(skin_weights,5126,'VEC4')}
+attributes = {'POSITION':accessor(positions,5126,'VEC3',True),'NORMAL':accessor(normals.astype('<f4'),5126,'VEC3'),'JOINTS_0':accessor(skin_indices,5123,'VEC4'),'WEIGHTS_0':accessor(skin_weights,5126,'VEC4')}
 primitives = [{'attributes':attributes,'indices':accessor(np.array(part,dtype='<u2').reshape(-1),5123,'SCALAR'),'material':i} for i,part in enumerate(part_indices) if part]
 bind = accessor(np.array(inverses,dtype='<f4'),5126,'MAT4')
 root_index = len(nodes); nodes.append({'name':'NaturalAthlete','children':list(range(root_index))+[root_index+1], 'extras':{'eyes':[joint('eye.L').tolist(),joint('eye.R').tolist()], 'source':'MakeHuman CC0'}}); nodes.append({'name':'ContinuousHumanMesh','mesh':0,'skin':0})
-gltf = {'asset':{'version':'2.0','generator':'AFTERHOURS / MakeHuman CC0 athlete builder'},'scene':0,'scenes':[{'nodes':[root_index]}],'nodes':nodes,'skins':[{'joints':list(range(root_index)),'inverseBindMatrices':bind}],'meshes':[{'primitives':primitives}],'materials':materials,'images':[{'uri':'fitness-skin.png'}],'textures':[{'source':0}],'buffers':[{'byteLength':len(blob)}],'bufferViews':views,'accessors':accessors}
+gltf = {'asset':{'version':'2.0','generator':'AFTERHOURS / MakeHuman CC0 anime athlete builder'},'scene':0,'scenes':[{'nodes':[root_index]}],'nodes':nodes,'skins':[{'joints':list(range(root_index)),'inverseBindMatrices':bind}],'meshes':[{'primitives':primitives}],'materials':materials,'buffers':[{'byteLength':len(blob)}],'bufferViews':views,'accessors':accessors}
 json_bytes = json.dumps(gltf,separators=(',',':')).encode(); json_bytes += b' ' * (-len(json_bytes)%4); blob += b'\0' * (-len(blob)%4)
 result = struct.pack('<III',0x46546c67,2,12+8+len(json_bytes)+8+len(blob))+struct.pack('<II',len(json_bytes),0x4e4f534a)+json_bytes+struct.pack('<II',len(blob),0x004e4942)+blob
 output = ROOT/'public/models'; output.mkdir(parents=True,exist_ok=True); (output/'fitness-athlete.glb').write_bytes(result); (output/'MAKEHUMAN-LICENSE.md').write_text((SOURCE/'LICENSE.ASSETS.md').read_text(encoding='utf8'),encoding='utf8')
-credits={'source':'https://github.com/makehumancommunity/makehuman','license':'CC0-1.0','authors':'MakeHuman Team / Data Collection AB, Joel Palmius, Jonas Hauquier','modifications':'Adult male athletic morphology, collapsed deformation rig, full-coverage compression outfit, gloves, textured skin, original runtime deadlift poses','skin_texture':'https://free.downloads.tuxfamily.net/makehuman/assets/1.1/base/skins/textures/young_lightskinned_male_diffuse2.png','skin_texture_sha256':hashlib.sha256((output/'fitness-skin.png').read_bytes()).hexdigest(),'source_sha256':{name:hashlib.sha256((SOURCE/name).read_bytes()).hexdigest() for name in FILES},'vertices':len(positions),'triangles':len(indices)}
+credits={'source':'https://github.com/makehumancommunity/makehuman','license':'CC0-1.0','authors':'MakeHuman Team / Data Collection AB, Joel Palmius, Jonas Hauquier','modifications':'Adult male athletic morphology, collapsed deformation rig, orange martial-arts outfit colors, original runtime hair, accessories and deadlift poses','source_sha256':{name:hashlib.sha256((SOURCE/name).read_bytes()).hexdigest() for name in FILES},'vertices':len(positions),'triangles':len(indices)}
 (output/'fitness-athlete-source.json').write_text(json.dumps(credits,indent=2)+'\n',encoding='utf8')
 print(json.dumps({'bytes':len(result),'vertices':len(positions),'triangles':len(indices),'bones':len(names),'hip':hips.tolist(),'shoulders':shoulders.tolist(),'eyes':[joint('eye.L').tolist(),joint('eye.R').tolist()]}))
 

@@ -8,9 +8,9 @@ export function createFitnessStage({ onExit, onRecords }) {
     <header class="fitness-header"><div class="fitness-brand"><b>ah<span>.</span></b><div>TRAINING BAY<small>AFTERHOURS / ROOM 05</small></div></div><button data-fitness="exit">返回主页 <span>↗</span></button></header>
     <div id="fitness-viewport"></div>
     <div class="fitness-intro"><span>05 / ONE MORE REP</span><h2 id="fitness-title">训练区<span>.</span></h2><div class="fitness-load"><strong>200<small>KG</small></strong><p>硬拉台 / DEADLIFT PLATFORM</p></div></div>
-    <section class="fitness-panel" aria-label="硬拉动作步骤">
+    <section class="fitness-panel" aria-label="悟空硬拉动作步骤">
       <div class="fitness-panel-kicker"><span>DEADLIFT / STEP BY STEP</span><span id="fitness-count">01 / 05</span></div>
-      <div class="fitness-status" role="status" aria-live="polite" aria-atomic="true"><span id="fitness-phase">下一步</span><h3 id="fitness-status">站位</h3><p id="fitness-detail">小人走到杠铃前，完成站位。</p></div>
+      <div class="fitness-status" role="status" aria-live="polite" aria-atomic="true"><span id="fitness-phase">下一步</span><h3 id="fitness-status">站位</h3><p id="fitness-detail">悟空走到杠铃前，完成站位。</p></div>
       <ol class="fitness-steps">${DEADLIFT_STEPS.map((step, i) => `<li data-step="${i + 1}"><span class="fitness-step-number">0${i + 1}</span><span class="fitness-step-title">${step.title}</span><span class="fitness-step-short">${step.short}</span><i aria-hidden="true"></i></li>`).join('')}</ol>
       <div class="fitness-progress" role="progressbar" aria-label="当前动作进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>
       <button id="fitness-next" data-fitness="next"><span>执行步骤 01</span><b>→</b></button>
